@@ -1,8 +1,26 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/admin',
+  '/links',
+  '/appearance',
+  '/analytics',
+  '/settings',
+];
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+
+  const pathname = request.nextUrl.pathname;
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+
+  // Fast path: public routes (home, /@username, /login, /register, /api, etc.)
+  // need no Supabase network call in middleware. Auth is enforced in layouts.
+  if (!isProtected) {
+    return supabaseResponse;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,13 +47,21 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Cek is_blocked
-  if (user && !request.nextUrl.pathname.startsWith('/blocked') && !request.nextUrl.pathname.startsWith('/login')) {
+  // Protected route without session: bounce to login fast.
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  // Blocked check for logged-in users on protected routes.
+  if (pathname !== '/blocked') {
     const { data: profileCheck } = await supabase
       .from('profiles')
       .select('is_blocked')
       .eq('id', user.id)
       .single();
+
     if (profileCheck?.is_blocked) {
       await supabase.auth.signOut();
       const url = request.nextUrl.clone();
@@ -44,23 +70,8 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Protect dashboard routes
-  if (
-    !user &&
-    (request.nextUrl.pathname.startsWith('/dashboard') ||
-      request.nextUrl.pathname.startsWith('/admin') ||
-      request.nextUrl.pathname.startsWith('/links') ||
-      request.nextUrl.pathname.startsWith('/appearance') ||
-      request.nextUrl.pathname.startsWith('/analytics') ||
-      request.nextUrl.pathname.startsWith('/settings'))
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
-
-  // Protect admin routes - check role server-side
-  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+  // Admin role check only on /admin routes.
+  if (pathname.startsWith('/admin')) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')

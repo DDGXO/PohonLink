@@ -1,7 +1,8 @@
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import type { Profile, Link } from '@/types/database';
 
-export async function getProfileByUsername(username: string) {
+export const getProfileByUsername = cache(async (username: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('profiles')
@@ -12,9 +13,9 @@ export async function getProfileByUsername(username: string) {
 
   if (error) return null;
   return data as Profile;
-}
+});
 
-export async function getProfileById(id: string) {
+export const getProfileById = cache(async (id: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('profiles')
@@ -24,9 +25,9 @@ export async function getProfileById(id: string) {
 
   if (error) return null;
   return data as Profile;
-}
+});
 
-export async function getActiveLinks(userId: string) {
+export const getActiveLinks = cache(async (userId: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('links')
@@ -38,9 +39,9 @@ export async function getActiveLinks(userId: string) {
 
   if (error) return [];
   return data as Link[];
-}
+});
 
-export async function getAllLinks(userId: string) {
+export const getAllLinks = cache(async (userId: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('links')
@@ -51,9 +52,9 @@ export async function getAllLinks(userId: string) {
 
   if (error) return [];
   return data as Link[];
-}
+});
 
-export async function getProfileStats(userId: string) {
+export const getProfileStats = cache(async (userId: string) => {
   const supabase = await createClient();
 
   const { count: totalLinks } = await supabase
@@ -82,17 +83,45 @@ export async function getProfileStats(userId: string) {
     totalViews: totalViews ?? 0,
     totalClicks,
   };
-}
+});
 
-export async function getUserCount() {
+export const getUserCount = cache(async () => {
   const supabase = await createClient();
   const { count } = await supabase
     .from('profiles')
     .select('*', { count: 'exact', head: true });
   return count ?? 0;
-}
+});
 
-export async function getAllUsers(page: number = 1, limit: number = 20) {
+export const getOsBreakdown = cache(async (profileId: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('analytics_events')
+    .select('os')
+    .eq('profile_id', profileId)
+    .eq('event', 'pageview')
+    .not('os', 'is', null);
+
+  if (error) return [];
+  const counts: Record<string, number> = {};
+  for (const row of data) {
+    const os = row.os || 'unknown';
+    counts[os] = (counts[os] || 0) + 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+});
+
+export const getPageviewCount = cache(async (profileId: string) => {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from('analytics_events')
+    .select('*', { count: 'exact', head: true })
+    .eq('profile_id', profileId)
+    .eq('event', 'pageview');
+  return count ?? 0;
+});
+
+export const getAllUsers = cache(async (page: number = 1, limit: number = 20) => {
   const supabase = await createClient();
   const offset = (page - 1) * limit;
 
@@ -104,7 +133,7 @@ export async function getAllUsers(page: number = 1, limit: number = 20) {
 
   if (error) return { users: [], total: 0 };
   return { users: data as Profile[], total: count ?? 0 };
-}
+});
 
 export async function updateProfileSortOrder(
   userId: string,

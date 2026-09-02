@@ -2,22 +2,19 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
-import { getProfileStats } from '@/lib/db/queries';
+import { getProfileStats, getProfileById } from '@/lib/db/queries';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username, display_name')
-    .eq('id', user.id)
-    .single();
-
   const headersList = await headers();
   const host = headersList.get('host') || 'pohonlink.id';
-  const stats = await getProfileStats(user.id);
+  const [profile, stats] = await Promise.all([
+    getProfileById(user.id),
+    getProfileStats(user.id),
+  ]);
 
   const statCards = [
     { label: 'Total Link', value: stats.totalLinks, icon: '⛓' },

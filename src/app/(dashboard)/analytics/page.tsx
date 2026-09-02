@@ -1,34 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { getAllLinks } from '@/lib/db/queries';
+import { getAllLinks, getPageviewCount, getOsBreakdown } from '@/lib/db/queries';
 
 export default async function AnalyticsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const links = await getAllLinks(user.id);
-
-  const { count: totalViews } = await supabase
-    .from('analytics_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('profile_id', user.id)
-    .eq('event', 'pageview');
-
-  const { data: osStat } = await supabase
-    .from('analytics_events')
-    .select('os')
-    .eq('profile_id', user.id)
-    .eq('event', 'pageview')
-    .not('os', 'is', null);
-
-  // Count OS
-  const osCounts: Record<string, number> = {};
-  (osStat || []).forEach((row) => {
-    const os = row.os || 'unknown';
-    osCounts[os] = (osCounts[os] || 0) + 1;
-  });
-  const osEntries = Object.entries(osCounts).sort((a, b) => b[1] - a[1]);
+  const [links, totalViews, osEntries] = await Promise.all([
+    getAllLinks(user.id),
+    getPageviewCount(user.id),
+    getOsBreakdown(user.id),
+  ]);
 
   const totalClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
   const topLinks = [...links].sort((a, b) => b.click_count - a.click_count).slice(0, 10);
