@@ -1,0 +1,523 @@
+'use client';
+
+import { useState, useTransition, useRef } from 'react';
+import { updateTheme, uploadBackground, removeBackground } from '@/app/actions';
+import type { ThemeConfig } from '@/types/database';
+
+const PRESETS: { name: string; label: string; config: Partial<ThemeConfig> }[] = [
+  { name: 'default', label: '🌑 Dark', config: { bg_value: '#0a0a0a', card_bg: '#161616', text_color: '#f0ece4' } },
+  { name: 'light', label: '☀️ Light', config: { bg_value: '#f5f5f0', card_bg: '#ffffff', text_color: '#111111' } },
+  { name: 'forest', label: '🌲 Forest', config: { bg_value: '#0d1f0d', card_bg: '#162516', text_color: '#d4f5d4' } },
+  { name: 'ocean', label: '🌊 Ocean', config: { bg_value: '#050d1f', card_bg: '#0d1a2e', text_color: '#d4eaf5' } },
+  { name: 'purple', label: '💜 Purple', config: { bg_value: '#0d0514', card_bg: '#1a0d24', text_color: '#f0d4f5' } },
+];
+
+const RADIUS_OPTIONS = [
+  { label: 'Sharp', value: '4px' },
+  { label: 'Rounded', value: '12px' },
+  { label: 'Pill', value: '9999px' },
+];
+
+const CSS_TEMPLATES = [
+  {
+    name: 'Glow Neon',
+    css: `/* Neon Glow Hover Effect */
+.pohon-button {
+  transition: all 0.25s ease !important;
+}
+.pohon-button:hover {
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow: 0 0 15px rgba(74, 222, 128, 0.6), 0 0 30px rgba(74, 222, 128, 0.3) !important;
+  border-color: #4ade80 !important;
+}`,
+  },
+  {
+    name: 'Glassmorphism',
+    css: `/* Glassmorphism Blur Effect */
+.pohon-button {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+}
+.pohon-button:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}`,
+  },
+  {
+    name: 'Gradient Modern',
+    css: `/* Gradient Glow */
+.pohon-button {
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.35) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+.pohon-button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(124, 58, 237, 0.55) !important;
+}`,
+  },
+  {
+    name: 'Retro 3D',
+    css: `/* Retro 3D Shadow */
+.pohon-button {
+  box-shadow: 4px 4px 0px #3b82f6 !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.pohon-button:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px #a855f7 !important;
+}`,
+  },
+];
+
+const HTML_TEMPLATES = [
+  {
+    name: 'Banner Pengumuman',
+    html: '<div style="background: rgba(74, 222, 128, 0.12); border: 1px solid #4ade80; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; text-align: center; font-size: 13px; font-weight: 500;">\n  📢 Selamat datang di profil resmi saya!\n</div>',
+  },
+  {
+    name: 'Spotify Player',
+    html: '<iframe style="border-radius:12px; margin-bottom: 16px;" src="https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT?utm_source=generator" width="100%" height="80" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>',
+  },
+  {
+    name: 'Badge Status',
+    html: '<div style="display: flex; justify-content: center; margin-bottom: 16px;">\n  <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); padding: 5px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600;">🟢 Online & Siap Kolaborasi</span>\n</div>',
+  },
+  {
+    name: 'YouTube Embed',
+    html: '<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; margin-bottom: 16px;">\n  <iframe style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" src="https://www.youtube.com/embed/dQw4w9WgXcQ" allowfullscreen></iframe>\n</div>',
+  },
+];
+
+interface Props {
+  theme: ThemeConfig | null | undefined;
+  bgUrl: string | null;
+  username: string;
+  userId: string;
+}
+
+const DEFAULT_THEME: ThemeConfig = {
+  preset: 'default',
+  bg_type: 'color',
+  bg_value: '#0a0a0a',
+  card_bg: '#161616',
+  text_color: '#f0ece4',
+  btn_radius: '8px',
+  btn_style: 'solid',
+  font: 'Inter',
+  custom_css: '',
+};
+
+export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBgUrl, username }: Props) {
+  const [theme, setTheme] = useState<ThemeConfig>(initialTheme ?? DEFAULT_THEME);
+  const [bgUrl, setBgUrl] = useState<string | null>(initialBgUrl);
+  const [isPending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [bgMsg, setBgMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const refreshPreview = () => {
+    if (iframeRef.current) iframeRef.current.src = iframeRef.current.src;
+  };
+
+  const applyPreset = (preset: typeof PRESETS[0]) => {
+    setTheme(prev => ({ ...prev, ...preset.config, preset: preset.name }));
+  };
+
+  const handleSave = () => {
+    startTransition(async () => {
+      const result = await updateTheme(theme);
+      if (!result?.error) {
+        setSaved(true);
+        refreshPreview();
+        setTimeout(() => setSaved(false), 2000);
+      }
+    });
+  };
+
+  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append('background', file);
+      const res = await uploadBackground(fd);
+      if (res?.error) {
+        setBgMsg({ type: 'error', text: res.error });
+      } else if (res?.bg_url) {
+        setBgUrl(res.bg_url);
+        setTheme(prev => ({ ...prev, bg_type: 'image' }));
+        setBgMsg({ type: 'success', text: 'Gambar latar berhasil diunggah!' });
+        refreshPreview();
+      }
+    });
+  };
+
+  const handleRemoveBg = () => {
+    if (!confirm('Hapus gambar latar kustom?')) return;
+    startTransition(async () => {
+      const res = await removeBackground();
+      if (!res?.error) {
+        setBgUrl(null);
+        setTheme(prev => ({ ...prev, bg_type: 'color' }));
+        setBgMsg({ type: 'success', text: 'Gambar latar dihapus' });
+        refreshPreview();
+      }
+    });
+  };
+
+
+  return (
+    <div className="responsive-grid-split">
+      {/* Settings Panel */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Presets */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Preset Tema</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {PRESETS.map(preset => (
+              <button
+                key={preset.name}
+                type="button"
+                onClick={() => applyPreset(preset)}
+                style={{
+                  padding: '8px 16px',
+                  background: theme.preset === preset.name ? 'var(--accent)' : 'var(--bg)',
+                  color: theme.preset === preset.name ? '#000' : 'var(--text-muted)',
+                  border: `1px solid ${theme.preset === preset.name ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                }}
+              >{preset.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Custom Background Image */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Gambar Latar Kustom (Background)</h3>
+          {bgMsg && (
+            <div style={{
+              padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '12px',
+              background: bgMsg.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(255,77,77,0.1)',
+              border: `1px solid ${bgMsg.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(255,77,77,0.3)'}`,
+              color: bgMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
+            }}>{bgMsg.text}</div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {bgUrl && (
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '8px',
+                backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                border: '1px solid var(--border)'
+              }} />
+            )}
+            <input type="file" ref={bgInputRef} onChange={handleBgUpload} accept="image/*" style={{ display: 'none' }} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => bgInputRef.current?.click()}
+                disabled={isPending}
+                style={{ padding: '8px 16px', background: 'var(--accent)', color: '#000', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                {isPending ? 'Mengunggah...' : bgUrl ? 'Ganti Gambar' : 'Unggah Gambar'}
+              </button>
+              {bgUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveBg}
+                  disabled={isPending}
+                  style={{ padding: '8px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--danger)', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Hapus
+                </button>
+              )}
+            </div>
+          </div>
+          <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px' }}>JPG, PNG, WEBP. Maksimal 5MB. Menimpa warna latar.</p>
+        </div>
+
+        {/* Colors */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Warna</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {[
+              { label: 'Warna Latar (jika tanpa gambar)', key: 'bg_value' as keyof ThemeConfig },
+              { label: 'Warna Tombol', key: 'card_bg' as keyof ThemeConfig },
+              { label: 'Warna Teks', key: 'text_color' as keyof ThemeConfig },
+            ].map(({ label, key }) => (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 500 }}>{label}</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="text"
+                    value={String(theme[key])}
+                    onChange={(e) => setTheme(prev => ({ ...prev, [key]: e.target.value }))}
+                    style={{
+                      width: '90px', padding: '6px 10px', background: 'var(--bg)',
+                      border: '1px solid var(--border)', borderRadius: '6px',
+                      color: 'var(--text)', fontSize: '12px', outline: 'none',
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                  <input
+                    type="color"
+                    value={String(theme[key])}
+                    onChange={(e) => setTheme(prev => ({ ...prev, [key]: e.target.value }))}
+                    style={{ width: '36px', height: '36px', borderRadius: '6px', border: 'none', cursor: 'pointer', padding: '2px' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Border Radius */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Bentuk Tombol</h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {RADIUS_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setTheme(prev => ({ ...prev, btn_radius: opt.value }))}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: theme.btn_radius === opt.value ? 'var(--accent)' : 'var(--bg)',
+                  color: theme.btn_radius === opt.value ? '#000' : 'var(--text-muted)',
+                  border: `1px solid ${theme.btn_radius === opt.value ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: '6px', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                }}
+              >{opt.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Custom CSS Section */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>Custom CSS</h3>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Target: .pohon-button, .pohon-name, .pohon-bio, dll.</span>
+          </div>
+
+          <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '12px' }}>
+            Pilih template siap pakai atau ketik CSS kustom kamu sendiri di bawah:
+          </p>
+
+          {/* Template Quick Insert */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+            {CSS_TEMPLATES.map(tmpl => (
+              <button
+                key={tmpl.name}
+                type="button"
+                onClick={() => setTheme(prev => ({ ...prev, custom_css: tmpl.css }))}
+                style={{
+                  padding: '5px 10px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  color: 'var(--accent)',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                + Template {tmpl.name}
+              </button>
+            ))}
+            {theme.custom_css && (
+              <button
+                type="button"
+                onClick={() => setTheme(prev => ({ ...prev, custom_css: '' }))}
+                style={{
+                  padding: '5px 10px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,77,77,0.3)',
+                  borderRadius: '6px',
+                  color: 'var(--danger)',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                Hapus CSS
+              </button>
+            )}
+          </div>
+
+          <textarea
+            value={theme.custom_css || ''}
+            onChange={(e) => setTheme(prev => ({ ...prev, custom_css: e.target.value }))}
+            placeholder={`/* Contoh: */\n.pohon-button:hover {\n  transform: translateY(-2px);\n  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);\n}`}
+            rows={8}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              color: '#4ade80',
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              outline: 'none',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Custom HTML */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)' }}>Custom HTML</h3>
+            <span style={{ fontSize: '11px', color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: '4px' }}>Embed / Widget</span>
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '12px' }}>
+            Pilih template atau masukkan kode HTML/widget bebas (banner, pemutar musik, status):
+          </p>
+
+          {/* HTML Templates */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+            {HTML_TEMPLATES.map(tmpl => (
+              <button
+                key={tmpl.name}
+                type="button"
+                onClick={() => setTheme(prev => ({ ...prev, custom_html: tmpl.html }))}
+                style={{
+                  padding: '5px 10px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  color: 'var(--accent)',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                + Template {tmpl.name}
+              </button>
+            ))}
+            {theme.custom_html && (
+              <button
+                type="button"
+                onClick={() => setTheme(prev => ({ ...prev, custom_html: '' }))}
+                style={{
+                  padding: '5px 10px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,77,77,0.3)',
+                  borderRadius: '6px',
+                  color: 'var(--danger)',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                }}
+              >
+                Hapus HTML
+              </button>
+            )}
+          </div>
+
+          <textarea
+            value={theme.custom_html || ''}
+            onChange={(e) => setTheme(prev => ({ ...prev, custom_html: e.target.value }))}
+            placeholder={'<!-- Ketik kode HTML kustom kamu di sini -->\n<div style="background: rgba(74,222,128,0.1); padding: 12px; border-radius: 8px; text-align: center;">\n  Halo Dunia!\n</div>'}
+            rows={6}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              color: '#60a5fa',
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              outline: 'none',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          disabled={isPending}
+          style={{
+            padding: '12px 24px',
+            background: saved ? 'var(--success)' : 'var(--accent)',
+            color: '#000', borderRadius: '8px', border: 'none',
+            fontSize: '14px', fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer',
+          }}
+        >{isPending ? 'Menyimpan...' : saved ? '✓ Tersimpan!' : 'Simpan Tampilan'}</button>
+      </div>
+
+      {/* Live Preview (Desktop Only) */}
+      <div className="responsive-preview-pane" style={{ width: '320px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Live Preview</p>
+          <button
+            type="button"
+            onClick={refreshPreview}
+            title="Refresh preview"
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '12px', cursor: 'pointer' }}
+          >
+            🔄 Refresh
+          </button>
+        </div>
+        <div style={{
+          width: '100%',
+          maxWidth: '320px',
+          height: '600px',
+          background: '#0d0d0d',
+          borderRadius: '40px',
+          border: '3px solid rgba(255,255,255,0.14)',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.7), inset 0 0 4px rgba(255,255,255,0.08)',
+          padding: '10px 8px 12px',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          {/* Dynamic Island */}
+          <div style={{
+            width: '80px',
+            height: '16px',
+            background: '#000000',
+            borderRadius: '9999px',
+            margin: '0 auto 8px',
+            flexShrink: 0,
+          }} />
+          {/* Screen Content */}
+          <div style={{
+            flex: 1,
+            borderRadius: '26px',
+            overflow: 'hidden',
+            background: 'var(--bg)',
+          }}>
+            <iframe
+              ref={iframeRef}
+              src={`/@${username}`}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="Live preview"
+              onLoad={(e) => {
+                try {
+                  const iframe = e.currentTarget as HTMLIFrameElement;
+                  if (iframe.contentDocument) {
+                    iframe.contentDocument.querySelectorAll('a, button').forEach(el => {
+                      el.addEventListener('click', (ev) => ev.preventDefault());
+                    });
+                  }
+                } catch {}
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
