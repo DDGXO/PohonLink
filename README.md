@@ -42,7 +42,7 @@ Pohonlink adalah platform biolink modern berkecepatan tinggi yang dibangun dari 
 
 ### 2. Instalasi Dependensi
 ```bash
-git clone https://github.com/DGameXO/pohonlink.git
+git clone https://github.com/DDGXO/pohonlink.git
 cd pohonlink
 pnpm install
 ```

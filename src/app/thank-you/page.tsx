@@ -96,7 +96,7 @@ export default function ThankYouPage() {
             Buka Dashboard
           </Link>
           <a
-            href="https://github.com/DGameXO/pohonlink"
+            href="https://github.com/DDGXO/pohonlink"
             target="_blank"
             rel="noopener noreferrer"
             style={{

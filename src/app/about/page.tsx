@@ -81,12 +81,12 @@ export default function AboutPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
               <span style={{ color: 'var(--text-dim, rgba(240, 236, 228, 0.5))' }}>Repository Resmi</span>
               <a
-                href="https://github.com/DGameXO/pohonlink"
+                href="https://github.com/DDGXO/pohonlink"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: 'var(--accent, #7DF9B6)', fontWeight: 600, textDecoration: 'none' }}
               >
-                DGameXO/pohonlink ↗
+                DDGXO/pohonlink ↗
               </a>
             </div>
           </div>
@@ -98,7 +98,7 @@ export default function AboutPage() {
 
         <div style={{ marginTop: '28px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <a
-            href="https://github.com/DGameXO/pohonlink"
+            href="https://github.com/DDGXO/pohonlink"
             target="_blank"
             rel="noopener noreferrer"
             style={{

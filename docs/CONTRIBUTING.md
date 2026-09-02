@@ -6,7 +6,7 @@
 
 ## 1. Alur Kerja Kontribusi (Contribution Workflow)
 
-1. **Fork Repositori**: Buat salinan (*fork*) repositori resmi [https://github.com/DGameXO/pohonlink](https://github.com/DGameXO/pohonlink) ke akun GitHub Anda.
+1. **Fork Repositori**: Buat salinan (*fork*) repositori resmi [https://github.com/DDGXO/pohonlink](https://github.com/DDGXO/pohonlink) ke akun GitHub Anda.
 2. **Buat Branch Fitur**: Buat cabang kerja baru dari branch `main`:
    ```bash
    git checkout -b feat/nama-fitur-anda

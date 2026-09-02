@@ -20,7 +20,7 @@ export function ConsoleBranding() {
       "color:rgba(240,236,228,0.4);font-size:12px;font-family:monospace;font-style:italic;"
     );
     console.log(
-      "%cgithub.com/DGameXO | contact@dgxohq.com | dgxohq.com",
+      "%cgithub.com/DDGXO | contact@dgxohq.com | dgxohq.com",
       "color:rgba(240,236,228,0.25);font-size:11px;font-family:monospace;"
     );
     console.log(
