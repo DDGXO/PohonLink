@@ -4,6 +4,23 @@ Semua perubahan dan pembaruan pada proyek **Pohonlink** dicatat di dalam dokumen
 
 ---
 
+## [v0.5.0] - 2026-09-03
+
+### 🌿 Landing Page Interaktif & Pengamanan Sesi Auth
+- **Landing Page Interaktif (`phn.my.id` / `/`)**:
+  - Hero 2-kolom dengan form klaim username langsung (`phn.my.id/@username`).
+  - **Live Interactive Profile Card Mockup**: Pratinjau profil biolink dan toko online yang dapat diklik secara interaktif langsung pada landing page.
+  - Tombol demo langsung menuju profil `phn.my.id/@dgamexo` pada bilah navigasi, hero section, dan kartu pratinjau.
+  - Grid fitur fungsional dengan ikon SVG monokrom, sudut tajam presisi (`4px`), dan palet warna resmi (`#050505`, `#161616`, `#7DF9B6`).
+- **Proteksi Pengalihan Auth**:
+  - Middleware (`src/lib/supabase/middleware.ts`) dan Server Layout (`src/app/(auth)/layout.tsx`) otomatis mengalihkan pengguna yang telah memiliki sesi aktif ke `/dashboard` saat mengakses rute otentikasi (`/login`, `/register`, `/forgot-password`, `/reset-password`).
+  - Tombol aksi pada landing page otomatis menyesuaikan status login pengguna.
+- **Atribusi Open Source & Sinkronisasi Brand**:
+  - Menghapus klaim gratis permanen dan menambahkan atribusi repositori open source resmi di GitHub (`DDGXO/PohonLink`) bagi pengguna yang ingin melakukan self-host mandiri.
+  - Menyelaraskan motto/tagline resmi: `Pohonlink: Your Single Link for Everything.`
+
+---
+
 ## [v0.4.0] - 2026-09-03
 
 ### 🛍️ E-Commerce Showcase & Toko Online (`/@username/shop` & Tab Toko)

@@ -53,7 +53,7 @@ export default function RegisterPage() {
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '24px' }}>🌿</div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>Buat Akun</h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-dim)' }}>Gratis selamanya untuk fitur dasar</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-dim)' }}>Mulai buat biolink dan toko online kamu</p>
         </div>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '28px' }}>
           {error && <div style={{ padding: '10px 14px', background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.3)', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: 'var(--danger)' }}>{error}</div>}
@@ -91,6 +91,9 @@ export default function RegisterPage() {
         </div>
         <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-dim)', marginTop: '20px' }}>
           Sudah punya akun?{' '}<Link href="/login" style={{ color: 'var(--accent)', fontWeight: 500 }}>Masuk</Link>
+        </p>
+        <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px', opacity: 0.7 }}>
+          Open source di <a href="https://github.com/DDGXO/PohonLink" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>DDGXO/PohonLink</a> untuk self-host.
         </p>
       </div>
     </main>

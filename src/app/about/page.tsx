@@ -50,7 +50,7 @@ export default function AboutPage() {
             Tentang Pohonlink
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--accent, #7DF9B6)', fontFamily: 'monospace', fontWeight: 600 }}>
-            Pohonlink: Your Digital Tree, Everywhere.
+            Pohonlink: Your Single Link for Everything.
           </p>
         </div>
 

@@ -5,9 +5,17 @@ const PROTECTED_PREFIXES = [
   '/dashboard',
   '/admin',
   '/links',
+  '/shop',
   '/appearance',
   '/analytics',
   '/settings',
+];
+
+const AUTH_PREFIXES = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
 ];
 
 export async function updateSession(request: NextRequest) {
@@ -15,10 +23,10 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isAuthRoute = AUTH_PREFIXES.some((p) => pathname.startsWith(p));
 
-  // Fast path: public routes (home, /@username, /login, /register, /api, etc.)
-  // need no Supabase network call in middleware. Auth is enforced in layouts.
-  if (!isProtected) {
+  // Fast path: pure public routes (/about, /thank-you, /@username, /api, static)
+  if (!isProtected && !isAuthRoute) {
     return supabaseResponse;
   }
 
@@ -48,9 +56,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Protected route without session: bounce to login fast.
-  if (!user) {
+  if (isProtected && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  // Auth route (login/register) with active session: bounce to dashboard fast.
+  if (isAuthRoute && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
