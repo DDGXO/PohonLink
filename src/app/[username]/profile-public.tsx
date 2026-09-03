@@ -9,6 +9,8 @@ import AnimatedBackground from '@/components/animated-background';
 interface Props {
   profile: Profile;
   links: Link[];
+  products?: Link[];
+  initialTab?: 'links' | 'shop';
 }
 
 const getDomain = (urlStr: string) => {
@@ -17,6 +19,13 @@ const getDomain = (urlStr: string) => {
   } catch {
     return '';
   }
+};
+
+const formatCurrency = (val: string | number | undefined) => {
+  if (!val) return 'Rp 0';
+  const num = typeof val === 'number' ? val : parseInt(String(val).replace(/[^0-9]/g, ''), 10);
+  if (isNaN(num)) return 'Rp 0';
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -31,8 +40,11 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(255, 255, 255, ${alpha})`;
 }
 
-export default function ProfilePublic({ profile, links }: Props) {
+export default function ProfilePublic({ profile, links, products = [], initialTab = 'links' }: Props) {
   const theme = profile.theme_config;
+  const isShopEnabled = profile.settings?.enable_shop !== false;
+  const hasShop = isShopEnabled && products.length > 0;
+  const [activeTab, setActiveTab] = useState<'links' | 'shop'>(initialTab === 'shop' && isShopEnabled ? 'shop' : 'links');
   const [copied, setCopied] = useState(false);
   const [unlockedLinks, setUnlockedLinks] = useState<Record<string, boolean>>({});
   const [activeLockModal, setActiveLockModal] = useState<{ link: Link; href: string } | null>(null);
@@ -68,6 +80,16 @@ export default function ProfilePublic({ profile, links }: Props) {
       return;
     }
     executeLinkOpen(link, href);
+  };
+
+  const handleProductClick = (product: Link) => {
+    if (!product.url) return;
+    navigator.sendBeacon('/api/track-click', JSON.stringify({ linkId: product.id, profileId: profile.id }));
+    if (profile.settings?.open_links_new_tab) {
+      window.open(product.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    window.location.assign(product.url);
   };
 
   const handleUnlockSubmit = (e: React.FormEvent) => {
@@ -349,180 +371,536 @@ export default function ProfilePublic({ profile, links }: Props) {
           />
         )}
 
-        {/* Links Container (List / Grid / Carousel Layouts) */}
-        <div
-          className={`pohon-links layout-${layoutType}`}
-          style={{
-            ...(layoutType === 'grid'
-              ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', width: '100%' }
-              : layoutType === 'carousel'
-              ? { display: 'flex', gap: '14px', overflowX: 'auto', scrollSnapType: 'x mandatory', paddingBottom: '14px', width: '100%', WebkitOverflowScrolling: 'touch' }
-              : { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }),
-          }}
-        >
-          {links.map((link) => {
-                const meta = link.custom_css as Record<string, unknown> | null;
-                const embedInfo = link.url ? getMediaEmbedUrl(link.url) : null;
-                const isEmbed = meta?.embed_type || embedInfo?.type;
 
-                // 1. Heading
-                if (link.type === 'heading') return (
-                  <div key={link.id} className="pohon-heading" style={{ textAlign: 'center', padding: '12px 0 4px', gridColumn: layoutType === 'grid' ? '1 / -1' : undefined, width: layoutType === 'carousel' ? '100%' : undefined }}>
-                    <p style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.65, color: theme.text_color }}>
-                      {link.title}
-                    </p>
-                  </div>
-                );
 
-                // 2. Spacer
-                if (link.type === 'spacer') return (
-                  <div key={link.id} className="pohon-spacer" style={{ height: `${link.url || '20'}px`, gridColumn: layoutType === 'grid' ? '1 / -1' : undefined }} />
-                );
+        {/* Tab Switcher if Shop is enabled and has products */}
+        {hasShop && (
+          <div style={{
+            display: 'flex',
+            background: 'rgba(255,255,255,0.08)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: '9999px',
+            padding: '4px',
+            marginBottom: '20px',
+            width: '100%',
+            maxWidth: '340px',
+            marginLeft: 'auto',
+            marginRight: 'auto',
+            border: '1px solid rgba(255,255,255,0.12)',
+            boxSizing: 'border-box',
+          }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('links')}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '9999px',
+                border: 'none',
+                background: activeTab === 'links' ? (theme.card_bg || 'rgba(255,255,255,0.25)') : 'transparent',
+                color: theme.text_color,
+                fontSize: '13px',
+                fontWeight: activeTab === 'links' ? 700 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: activeTab === 'links' ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+              }}
+            >
+              🔗 Tautan ({links.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('shop')}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '9999px',
+                border: 'none',
+                background: activeTab === 'shop' ? (theme.card_bg || 'rgba(255,255,255,0.25)') : 'transparent',
+                color: theme.text_color,
+                fontSize: '13px',
+                fontWeight: activeTab === 'shop' ? 700 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: activeTab === 'shop' ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
+              }}
+            >
+              🛍️ {profile.settings?.shop_title || 'Toko'} ({products.length})
+            </button>
+          </div>
+        )}
 
-                // 3. Text Block
-                if (link.type === 'text' && !meta?.is_html) return (
-                  <div key={link.id} className="pohon-text" style={{ padding: '8px 12px', color: theme.text_color, fontSize: '14px', opacity: 0.85, lineHeight: 1.6, textAlign: 'center', whiteSpace: 'pre-line', gridColumn: layoutType === 'grid' ? '1 / -1' : undefined }}>
-                    {link.url}
-                  </div>
-                );
+        {/* Links Tab Content */}
+        {activeTab === 'links' && (
+          <div
+            className={`pohon-links layout-${layoutType}`}
+            style={{
+              ...(layoutType === 'grid'
+                ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', width: '100%' }
+                : layoutType === 'carousel'
+                ? { display: 'flex', gap: '14px', overflowX: 'auto', scrollSnapType: 'x mandatory', paddingBottom: '14px', width: '100%', WebkitOverflowScrolling: 'touch' }
+                : { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }),
+            }}
+          >
+            {links.map((link) => {
+                  const meta = link.custom_css as Record<string, unknown> | null;
+                  const embedInfo = link.url ? getMediaEmbedUrl(link.url) : null;
+                  const isEmbed = meta?.embed_type || embedInfo?.type;
 
-                // 4. HTML Block
-                if (link.type === 'html' || meta?.is_html) return (
-                  <div
-                    key={link.id}
-                    className="pohon-html-block"
-                    style={{ width: '100%', overflow: 'hidden', gridColumn: layoutType === 'grid' ? '1 / -1' : undefined }}
-                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(link.url) }}
-                  />
-                );
+                  if (link.type === 'heading') {
+                    return (
+                      <div
+                        key={link.id}
+                        className="pohon-heading"
+                        style={{
+                          width: '100%',
+                          textAlign: 'center',
+                          padding: '12px 0 4px',
+                          gridColumn: layoutType === 'grid' ? '1 / -1' : undefined,
+                        }}
+                      >
+                        <h3 style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', opacity: 0.9, margin: 0 }}>
+                          {link.title}
+                        </h3>
+                      </div>
+                    );
+                  }
 
-                // 5. Media Embed: Spotify
-                if (isEmbed === 'spotify' && embedInfo?.embedUrl) {
-                  return (
-                    <div key={link.id} style={{ width: '100%', gridColumn: layoutType === 'grid' ? '1 / -1' : undefined, borderRadius: theme.btn_radius, overflow: 'hidden' }}>
-                      <iframe
-                        src={embedInfo.embedUrl}
-                        width="100%"
-                        height="152"
-                        frameBorder="0"
-                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                        loading="lazy"
-                        style={{ border: 'none', borderRadius: theme.btn_radius }}
+                  if (link.type === 'spacer') {
+                    const heightPx = meta?.height ? Number(meta.height) : 24;
+                    return (
+                      <div
+                        key={link.id}
+                        className="pohon-spacer"
+                        style={{
+                          height: `${heightPx}px`,
+                          width: '100%',
+                          gridColumn: layoutType === 'grid' ? '1 / -1' : undefined,
+                        }}
                       />
-                    </div>
-                  );
-                }
+                    );
+                  }
 
-                // 6. Media Embed: YouTube
-                if (isEmbed === 'youtube' && embedInfo?.embedUrl) {
-                  return (
-                    <div key={link.id} style={{ width: '100%', gridColumn: layoutType === 'grid' ? '1 / -1' : undefined, borderRadius: theme.btn_radius, overflow: 'hidden' }}>
-                      <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: theme.btn_radius }}>
-                        <iframe
-                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                          src={embedInfo.embedUrl}
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
+                  if (link.type === 'text') {
+                    if (meta?.is_html && link.url) {
+                      return (
+                        <div
+                          key={link.id}
+                          className="pohon-custom-html"
+                          style={{
+                            width: '100%',
+                            overflow: 'hidden',
+                            gridColumn: layoutType === 'grid' ? '1 / -1' : undefined,
+                          }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(link.url) }}
                         />
+                      );
+                    }
+                    return (
+                      <div
+                        key={link.id}
+                        className="pohon-text-block"
+                        style={{
+                          width: '100%',
+                          textAlign: 'center',
+                          padding: '8px 16px',
+                          fontSize: '13px',
+                          opacity: 0.75,
+                          lineHeight: 1.5,
+                          gridColumn: layoutType === 'grid' ? '1 / -1' : undefined,
+                        }}
+                      >
+                        {link.title}
+                      </div>
+                    );
+                  }
+
+                  if (isEmbed && link.url) {
+                    const embed = embedInfo;
+                    const embedType = meta?.embed_type || embed?.type;
+                    const embedSrc = meta?.embed_url || embed?.embedUrl;
+
+                    if (embedSrc) {
+                      return (
+                        <div
+                          key={link.id}
+                          className="pohon-embed-card"
+                          style={{
+                            width: '100%',
+                            borderRadius: theme.btn_radius || '12px',
+                            overflow: 'hidden',
+                            background: theme.card_bg,
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            gridColumn: layoutType === 'grid' ? '1 / -1' : undefined,
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                          }}
+                        >
+                          {link.title && (
+                            <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '13px' }}>
+                                {embedType === 'spotify' ? '🎵' : embedType === 'youtube' ? '▶️' : '🍎'}
+                              </span>
+                              <span style={{ fontSize: '13px', fontWeight: 600 }}>{link.title}</span>
+                            </div>
+                          )}
+                          <div style={{ position: 'relative', width: '100%', minHeight: embedType === 'spotify' ? '152px' : embedType === 'apple_music' ? '175px' : '220px' }}>
+                            <iframe
+                              src={String(embedSrc)}
+                              width="100%"
+                              height={embedType === 'spotify' ? '152' : embedType === 'apple_music' ? '175' : '220'}
+                              style={{ border: 'none', display: 'block' }}
+                              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                              loading="lazy"
+                              title={link.title || 'Media Embed'}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+
+                  let href = '#';
+                  if (link.type === 'email' && link.url) {
+                    href = link.url.startsWith('mailto:') ? link.url : `mailto:${link.url}`;
+                  } else if (link.type === 'telephone' && link.url) {
+                    href = link.url.startsWith('tel:') ? link.url : `tel:${link.url}`;
+                  } else if (link.url) {
+                    href = sanitizeUrl(link.url);
+                  }
+
+                  const domain = link.url ? getDomain(link.url) : '';
+                  const btnStyles = getButtonStyles();
+                  const isLocked = meta?.is_locked && !unlockedLinks[link.id];
+
+                  return (
+                    <button
+                      key={link.id}
+                      onClick={() => handleLinkClick(link, href)}
+                      className={`pohon-link-btn ${link.is_pinned ? 'is-pinned' : ''}`}
+                      style={{
+                        ...btnStyles,
+                        width: '100%',
+                        padding: layoutType === 'grid' ? '14px 12px' : '15px 20px',
+                        color: theme.text_color,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textDecoration: 'none',
+                        boxSizing: 'border-box',
+                        minHeight: layoutType === 'grid' ? '72px' : '52px',
+                        flexShrink: layoutType === 'carousel' ? 0 : undefined,
+                        minWidth: layoutType === 'carousel' ? '200px' : undefined,
+                        scrollSnapAlign: layoutType === 'carousel' ? 'start' : undefined,
+                        touchAction: 'manipulation',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; (e.currentTarget as HTMLButtonElement).style.transform = 'none'; }}
+                    >
+                      {domain && !isLocked && (
+                        <img
+                          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+                          alt=""
+                          style={{
+                            width: '18px', height: '18px', borderRadius: '4px',
+                            position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
+                          }}
+                          onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                        />
+                      )}
+                      {link.type === 'email' && <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }}>📧</span>}
+                      {Boolean(isLocked) && <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px' }}>🔒</span>}
+
+                      <span style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.3 }}>
+                        {link.title}
+                      </span>
+
+                      {meta?.subtitle ? (
+                        <span style={{ fontSize: '11px', opacity: 0.75, fontWeight: 400, marginTop: '2px', lineHeight: 1.2 }}>
+                          {String(meta.subtitle)}
+                        </span>
+                      ) : null}
+
+                      {Boolean(isLocked) && (
+                        <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.18)', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', fontWeight: 500 }}>
+                          {meta?.lock_type === 'age' ? '18+ Terkunci' : meta?.lock_type === 'sensitive' ? 'Peringatan Konten' : 'Kunci PIN'}
+                        </span>
+                      )}
+                    </button>
+                  );
+            })}
+
+            {links.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '36px', opacity: 0.5, gridColumn: layoutType === 'grid' ? '1 / -1' : undefined }}>
+                <p style={{ fontSize: '14px' }}>Belum ada link yang aktif saat ini</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Shop Tab Content (Grid or List Layout) */}
+        {activeTab === 'shop' && (
+          <div
+            className={`pohon-shop-${profile.settings?.shop_layout || 'grid'}`}
+            style={{
+              ...(profile.settings?.shop_layout === 'list'
+                ? { display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }
+                : { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', width: '100%' }),
+              boxSizing: 'border-box',
+            }}
+          >
+            {products.map((product) => {
+              const meta = (product.custom_css as Record<string, unknown> | null) || {};
+              const hasOrigPrice = Boolean(meta.original_price && Number(meta.original_price) > Number(meta.price));
+              const discountPct = hasOrigPrice
+                ? Math.round(((Number(meta.original_price) - Number(meta.price)) / Number(meta.original_price)) * 100)
+                : 0;
+              const isList = profile.settings?.shop_layout === 'list';
+
+              if (isList) {
+                return (
+                  <div
+                    key={product.id}
+                    className="pohon-product-card-list"
+                    style={{
+                      background: theme.btn_style === 'outline' ? 'transparent' : (theme.card_bg || 'rgba(255,255,255,0.08)'),
+                      border: theme.btn_style === 'outline' ? `1.5px solid ${theme.text_color}` : '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '0px',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px',
+                      gap: '12px',
+                      color: theme.text_color,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {/* Thumbnail */}
+                    <div style={{ position: 'relative', width: '76px', height: '76px', flexShrink: 0, borderRadius: '0px', overflow: 'hidden', background: 'rgba(0,0,0,0.25)' }}>
+                      {meta.image_url ? (
+                        <img
+                          src={String(meta.image_url)}
+                          alt={product.title || ''}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '0px' }}
+                        />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>
+                          📦
+                        </div>
+                      )}
+                      {meta.badge ? (
+                        <span style={{
+                          position: 'absolute',
+                          top: '0px',
+                          left: '0px',
+                          background: 'rgba(0,0,0,0.9)',
+                          color: '#fff',
+                          fontSize: '8px',
+                          fontWeight: 700,
+                          padding: '2px 4px',
+                          borderRadius: '0px',
+                        }}>
+                          {String(meta.badge)}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Details Middle */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 2px', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {product.title}
+                      </h4>
+                      {meta.description ? (
+                        <p style={{ fontSize: '11px', opacity: 0.7, margin: '0 0 4px', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {String(meta.description)}
+                        </p>
+                      ) : null}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent, #4ade80)' }}>
+                          {formatCurrency(meta.price as string | number)}
+                        </span>
+                        {hasOrigPrice && (
+                          <span style={{ fontSize: '10px', opacity: 0.5, textDecoration: 'line-through' }}>
+                            {formatCurrency(meta.original_price as string | number)}
+                          </span>
+                        )}
+                        {discountPct > 0 && (
+                          <span style={{ fontSize: '9px', background: '#ef4444', color: '#fff', padding: '1px 4px', borderRadius: '0px', fontWeight: 700 }}>
+                            -{discountPct}%
+                          </span>
+                        )}
                       </div>
                     </div>
-                  );
-                }
 
-                // 7. Media Embed: Apple Music
-                if (isEmbed === 'apple_music' && embedInfo?.embedUrl) {
-                  return (
-                    <div key={link.id} style={{ width: '100%', gridColumn: layoutType === 'grid' ? '1 / -1' : undefined, borderRadius: theme.btn_radius, overflow: 'hidden' }}>
-                      <iframe
-                        src={embedInfo.embedUrl}
-                        width="100%"
-                        height="175"
-                        frameBorder="0"
-                        allow="autoplay *; encrypted-media *; fullscreen *; clipboard-write"
-                        style={{ width: '100%', maxWidth: '100%', overflow: 'hidden', borderRadius: theme.btn_radius, border: 'none' }}
-                      />
-                    </div>
-                  );
-                }
+                    {/* CTA Button Right */}
+                    <button
+                      type="button"
+                      onClick={() => handleProductClick(product)}
+                      style={{
+                        flexShrink: 0,
+                        padding: '8px 12px',
+                        background: 'var(--accent, #4ade80)',
+                        color: '#000000',
+                        border: 'none',
+                        borderRadius: '0px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'opacity 0.15s, transform 0.1s',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                    >
+                      {String(meta.button_text || 'Beli 🛒')}
+                    </button>
+                  </div>
+                );
+              }
 
-                // 8. Standard Links / Contact Buttons
-                const rawHref = link.type === 'email'
-                  ? (link.url?.startsWith('mailto:') ? link.url : `mailto:${link.url}`)
-                  : link.type === 'telephone'
-                  ? (link.url?.startsWith('tel:') ? link.url : `tel:${link.url}`)
-                  : link.url || '#';
-                const href = sanitizeUrl(rawHref);
-                const domain = link.type === 'link' && link.url ? getDomain(link.url) : '';
-                const btnStyleProps = getButtonStyles();
-                const isLocked = meta?.is_locked && !unlockedLinks[link.id];
-
-                return (
-                  <button
-                    key={link.id}
-                    onClick={() => handleLinkClick(link, href)}
-                    className="pohon-button"
-                    style={{
-                      width: layoutType === 'carousel' ? '240px' : '100%',
-                      minWidth: layoutType === 'carousel' ? '240px' : undefined,
-                      flexShrink: layoutType === 'carousel' ? 0 : undefined,
-                      scrollSnapAlign: layoutType === 'carousel' ? 'center' : undefined,
-                      minHeight: layoutType === 'grid' ? '72px' : '54px',
-                      padding: layoutType === 'grid' ? '12px 14px' : '12px 44px',
-                      ...btnStyleProps,
-                      color: theme.text_color,
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'opacity 0.15s, transform 0.15s, box-shadow 0.15s',
-                      boxSizing: 'border-box',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      touchAction: 'manipulation',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; (e.currentTarget as HTMLButtonElement).style.transform = 'none'; }}
-                  >
-                    {domain && !isLocked && (
+              return (
+                <div
+                  key={product.id}
+                  className="pohon-product-card"
+                  style={{
+                    background: theme.btn_style === 'outline' ? 'transparent' : (theme.card_bg || 'rgba(255,255,255,0.08)'),
+                    border: theme.btn_style === 'outline' ? `1.5px solid ${theme.text_color}` : '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '0px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    color: theme.text_color,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Product Image */}
+                  <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'rgba(0,0,0,0.25)', overflow: 'hidden', borderRadius: '0px' }}>
+                    {meta.image_url ? (
                       <img
-                        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-                        alt=""
+                        src={String(meta.image_url)}
+                        alt={product.title || ''}
                         style={{
-                          width: '18px', height: '18px', borderRadius: '4px',
-                          position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          borderRadius: '0px',
+                          transition: 'transform 0.3s',
                         }}
-                        onError={e => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                       />
+                    ) : (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
+                        📦
+                      </div>
                     )}
-                    {link.type === 'email' && <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }}>📧</span>}
-                    {Boolean(isLocked) && <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px' }}>🔒</span>}
 
-                    <span style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.3 }}>
-                      {link.title}
-                    </span>
-
-                    {meta?.subtitle ? (
-                      <span style={{ fontSize: '11px', opacity: 0.75, fontWeight: 400, marginTop: '2px', lineHeight: 1.2 }}>
-                        {String(meta.subtitle)}
+                    {/* Badge */}
+                    {meta.badge ? (
+                      <span style={{
+                        position: 'absolute',
+                        top: '0px',
+                        left: '0px',
+                        background: 'rgba(0,0,0,0.9)',
+                        color: '#fff',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        padding: '3px 6px',
+                        borderRadius: '0px',
+                      }}>
+                        {String(meta.badge)}
                       </span>
                     ) : null}
 
-                    {Boolean(isLocked) && (
-                      <span style={{ fontSize: '10px', background: 'rgba(255,255,255,0.18)', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', fontWeight: 500 }}>
-                        {meta?.lock_type === 'age' ? '18+ Terkunci' : meta?.lock_type === 'sensitive' ? 'Peringatan Konten' : 'Kunci PIN'}
+                    {/* Discount Pill */}
+                    {discountPct > 0 && (
+                      <span style={{
+                        position: 'absolute',
+                        top: '0px',
+                        right: '0px',
+                        background: '#ef4444',
+                        color: '#fff',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        padding: '3px 6px',
+                        borderRadius: '0px',
+                      }}>
+                        -{discountPct}%
                       </span>
                     )}
-                  </button>
-                );
-          })}
+                  </div>
 
-          {links.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '36px', opacity: 0.5, gridColumn: layoutType === 'grid' ? '1 / -1' : undefined }}>
-              <p style={{ fontSize: '14px' }}>Belum ada link yang aktif saat ini</p>
-            </div>
-          )}
-        </div>
+                  {/* Product Details */}
+                  <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                    <div>
+                      <h4 style={{ fontSize: '12px', fontWeight: 700, margin: '0 0 3px', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {product.title}
+                      </h4>
+                      {meta.description ? (
+                        <p style={{ fontSize: '10px', opacity: 0.7, margin: '0 0 6px', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {String(meta.description)}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      {/* Price */}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent, #4ade80)' }}>
+                          {formatCurrency(meta.price as string | number)}
+                        </span>
+                        {hasOrigPrice && (
+                          <span style={{ fontSize: '9px', opacity: 0.5, textDecoration: 'line-through' }}>
+                            {formatCurrency(meta.original_price as string | number)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* CTA Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleProductClick(product)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 8px',
+                          background: 'var(--accent, #4ade80)',
+                          color: '#000000',
+                          border: 'none',
+                          borderRadius: '0px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'opacity 0.15s, transform 0.1s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                      >
+                        {String(meta.button_text || 'Beli Sekarang 🛒')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {products.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '36px', opacity: 0.5, gridColumn: '1 / -1' }}>
+                <p style={{ fontSize: '14px' }}>Belum ada produk di toko</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Social Icons Bar (Bottom position) */}
         {isSocialBottom && renderSocialBar()}

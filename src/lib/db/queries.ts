@@ -62,6 +62,7 @@ export const getActiveLinks = cache(async (userId: string) => {
     .map(normalizeLink)
     .filter(link => {
       const meta = link.custom_css as Record<string, unknown> | null;
+      if (meta?.is_product) return false;
       if (meta?.schedule_start) {
         const st = new Date(meta.schedule_start as string).getTime();
         if (!isNaN(st) && now < st) return false;
@@ -71,6 +72,43 @@ export const getActiveLinks = cache(async (userId: string) => {
         if (!isNaN(et) && now > et) return false;
       }
       return true;
+    });
+});
+
+export const getActiveProducts = cache(async (userId: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('links')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('is_pinned', { ascending: false })
+    .order('sort_order', { ascending: true });
+
+  if (error || !data) return [];
+  return data
+    .map(normalizeLink)
+    .filter(link => {
+      const meta = link.custom_css as Record<string, unknown> | null;
+      return Boolean(meta?.is_product);
+    });
+});
+
+export const getAllProducts = cache(async (userId: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('links')
+    .select('*')
+    .eq('user_id', userId)
+    .order('is_pinned', { ascending: false })
+    .order('sort_order', { ascending: true });
+
+  if (error || !data) return [];
+  return data
+    .map(normalizeLink)
+    .filter(link => {
+      const meta = link.custom_css as Record<string, unknown> | null;
+      return Boolean(meta?.is_product);
     });
 });
 
@@ -84,7 +122,12 @@ export const getAllLinks = cache(async (userId: string) => {
     .order('sort_order', { ascending: true });
 
   if (error || !data) return [];
-  return data.map(normalizeLink);
+  return data
+    .map(normalizeLink)
+    .filter(link => {
+      const meta = link.custom_css as Record<string, unknown> | null;
+      return !meta?.is_product;
+    });
 });
 
 export const getProfileStats = cache(async (userId: string) => {

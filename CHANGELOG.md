@@ -4,6 +4,34 @@ Semua perubahan dan pembaruan pada proyek **Pohonlink** dicatat di dalam dokumen
 
 ---
 
+## [v0.4.0] - 2026-09-03
+
+### 🛍️ E-Commerce Showcase & Toko Online (`/@username/shop` & Tab Toko)
+- **Toko Online & Showcase Produk**:
+  - Dukungan penuh pajang produk fisik, barang digital, atau jasa dengan foto produk (rasio 1:1), nama produk, dan deskripsi singkat.
+  - Penataan harga: Format mata uang Rupiah (`Rp`), harga coret / diskon asli (`original_price`), dan kalkulasi badge potongan persen otomatis (misal `-40%`).
+  - **Badge Promo Khusus**: `🔥 Best Seller`, `💥 Diskon Spesial`, `✨ Produk Baru`, `⏳ Stok Terbatas`, `📦 Pre-Order`, `⭐ Rekomendasi`.
+- **Checkout Hyperlink & Preset CTA**:
+  - Tombol CTA fleksibel yang mengarahkan pembeli langsung ke link checkout penjual (Shopee, Tokopedia, TikTok Shop, Custom URL).
+  - **WhatsApp Direct Order Generator**: Otomatis membuat link `https://wa.me/` dengan nomor telepon penjual dan template pesan pemesanan terformat rapi.
+- **Tampilan Publik & Tab Switcher**:
+  - Tab Switcher modern `[ 🔗 Tautan | 🛍️ Toko (N) ]` pada profil biolink publik (`/@username`).
+  - Rute mandiri `/@username/shop` untuk membagikan toko online langsung ke pelanggan.
+  - Tata letak grid kartu e-commerce 2-kolom responsif untuk mobile dan desktop.
+- **Manajemen Toko di Dashboard (`/shop`)**:
+  - Menu sidebar navigasi baru **Toko / Shop**.
+  - Dashboard pengelolaan katalog produk dengan modal tambah & edit produk, toggle aktif/nonaktif, pin produk ke atas, dan live mobile preview iframe toko.
+  - Pengaturan nama tab toko (misal: "Toko", "Katalog", "Merch", "Produk"), toggle visibilitas tab toko di profil, dan pemilih tata letak (Grid 2-kolom vs List vertikal).
+
+### 🛠️ Halaman Status & Standarisasi Tipografi DGXO
+- **Halaman Error Kustom**:
+  - `src/app/not-found.tsx` (404 Not Found): Tampilan 404 modern dengan ambient glow dan tombol navigasi kembali ke beranda.
+  - `src/app/error.tsx` (500 Error Boundary): Penanganan runtime error dengan tombol coba lagi (retry).
+  - `src/app/403/page.tsx` & `src/app/forbidden.tsx` (403 Forbidden): Halaman proteksi akses terlarang.
+- **Kepatuhan Tipografi DGXO**: Menghapus seluruh karakter em dash (`U+2014`) di seluruh basis kode `src/` dan menggantinya dengan pemisah standar.
+
+---
+
 ## [v0.3.0] - 2026-09-03
 
 ### ✨ Fitur Baru (Linktree Parity & Media Embeds)

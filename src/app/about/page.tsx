@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'About | Pohonlink',
-  description: 'Mengenal Pohonlink — platform biolink modern, cepat, dan open source oleh DGXO.',
+  description: 'Mengenal Pohonlink: platform biolink modern, cepat, dan open source oleh DGXO.',
 };
 
 export default function AboutPage() {
@@ -50,7 +50,7 @@ export default function AboutPage() {
             Tentang Pohonlink
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--accent, #7DF9B6)', fontFamily: 'monospace', fontWeight: 600 }}>
-            Pohonlink — Your Digital Tree, Everywhere.
+            Pohonlink: Your Digital Tree, Everywhere.
           </p>
         </div>
 

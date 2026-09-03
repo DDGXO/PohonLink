@@ -12,6 +12,19 @@ export interface ProfileSettings {
   show_footer?: boolean;
   custom_footer_text?: string;
   social_links?: Record<string, string>;
+  enable_shop?: boolean;
+  shop_title?: string;
+  shop_layout?: 'grid' | 'list';
+}
+
+export interface ProductMeta {
+  price?: number | string;
+  original_price?: number | string;
+  currency?: string;
+  image_url?: string;
+  button_text?: string;
+  badge?: string;
+  category?: string;
 }
 
 export interface Profile {

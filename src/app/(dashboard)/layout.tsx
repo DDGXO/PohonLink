@@ -13,6 +13,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: '▦' },
     { href: '/links', label: 'Links', icon: '⛓' },
+    { href: '/shop', label: 'Toko / Shop', icon: '🛍️' },
     { href: '/appearance', label: 'Tampilan', icon: '◑' },
     { href: '/analytics', label: 'Analitik', icon: '↗' },
     { href: '/settings', label: 'Pengaturan', icon: '⚙' },
@@ -124,7 +125,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div style={{ padding: '16px 12px', borderTop: '1px solid var(--border)' }}>
             <div style={{ marginBottom: '8px' }}>
               <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{profile?.display_name || user.email}</p>
-              <p style={{ fontSize: '11px', color: 'var(--text-dim)' }}>@{profile?.username || '—'}</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-dim)' }}>@{profile?.username || '-'}</p>
             </div>
             <form action={signOut}>
               <button

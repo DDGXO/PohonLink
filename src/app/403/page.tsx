@@ -49,7 +49,7 @@ export default function ForbiddenPage() {
         </div>
 
         <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>
-          403 — Akses Ditolak
+          403: Akses Ditolak
         </h1>
 
         <p style={{ fontSize: '14px', color: 'var(--text-dim, rgba(240, 236, 228, 0.5))', lineHeight: 1.6, marginBottom: '28px' }}>

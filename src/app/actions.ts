@@ -770,3 +770,165 @@ export async function importUserData(payload: { profile?: Record<string, unknown
   revalidatePath('/', 'layout');
   return { success: true };
 }
+
+export async function createProduct(formData: FormData) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const title = (formData.get('title') as string)?.trim();
+  const description = (formData.get('description') as string)?.trim() || '';
+  const rawUrl = (formData.get('url') as string)?.trim();
+  const price = (formData.get('price') as string)?.trim() || '0';
+  const original_price = (formData.get('original_price') as string)?.trim() || undefined;
+  const currency = (formData.get('currency') as string)?.trim() || 'IDR';
+  const button_text = (formData.get('button_text') as string)?.trim() || 'Beli Sekarang';
+  const badge = (formData.get('badge') as string)?.trim() || undefined;
+  const image_url = (formData.get('image_url') as string)?.trim() || undefined;
+  const category = (formData.get('category') as string)?.trim() || undefined;
+
+  if (!title) return { error: 'Nama produk tidak boleh kosong' };
+  if (!rawUrl) return { error: 'Link tujuan produk tidak boleh kosong' };
+
+  if (isDangerousUrl(rawUrl)) {
+    return { error: 'URL menggunakan protokol berbahaya yang dilarang' };
+  }
+
+  const finalUrl = formatSafeUrl(rawUrl);
+  if (!finalUrl) return { error: 'URL produk tidak valid' };
+
+  const { data: lastLink } = await session.supabase
+    .from('links')
+    .select('sort_order')
+    .eq('user_id', session.user.id)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const sort_order = (lastLink?.sort_order ?? -1) + 1;
+
+  const productMeta = {
+    is_product: true,
+    description,
+    price,
+    original_price,
+    currency,
+    button_text,
+    badge,
+    image_url,
+    category,
+  };
+
+  const { error } = await session.supabase.from('links').insert({
+    user_id: session.user.id,
+    title,
+    url: finalUrl,
+    type: 'link',
+    custom_css: productMeta,
+    icon: null,
+    sort_order,
+    is_active: true,
+    is_pinned: false,
+  } as unknown as Database['public']['Tables']['links']['Insert']);
+
+  if (error) return { error: error.message };
+  revalidatePath('/shop');
+  revalidatePath('/links');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateProduct(id: string, formData: FormData) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const title = (formData.get('title') as string)?.trim();
+  const description = (formData.get('description') as string)?.trim() || '';
+  const rawUrl = (formData.get('url') as string)?.trim();
+  const price = (formData.get('price') as string)?.trim() || '0';
+  const original_price = (formData.get('original_price') as string)?.trim() || undefined;
+  const currency = (formData.get('currency') as string)?.trim() || 'IDR';
+  const button_text = (formData.get('button_text') as string)?.trim() || 'Beli Sekarang';
+  const badge = (formData.get('badge') as string)?.trim() || undefined;
+  const image_url = (formData.get('image_url') as string)?.trim() || undefined;
+  const category = (formData.get('category') as string)?.trim() || undefined;
+
+  if (!title) return { error: 'Nama produk tidak boleh kosong' };
+  if (!rawUrl) return { error: 'Link tujuan produk tidak boleh kosong' };
+
+  if (isDangerousUrl(rawUrl)) {
+    return { error: 'URL menggunakan protokol berbahaya yang dilarang' };
+  }
+
+  const finalUrl = formatSafeUrl(rawUrl);
+  if (!finalUrl) return { error: 'URL produk tidak valid' };
+
+  const { data: existingLink } = await session.supabase
+    .from('links')
+    .select('custom_css')
+    .eq('id', id)
+    .eq('user_id', session.user.id)
+    .single();
+
+  if (!existingLink) return { error: 'Produk tidak ditemukan' };
+
+  const existingMeta = (existingLink.custom_css as Record<string, unknown> | null) || {};
+
+  const productMeta = {
+    ...existingMeta,
+    is_product: true,
+    description,
+    price,
+    original_price,
+    currency,
+    button_text,
+    badge,
+    image_url,
+    category,
+  };
+
+  const { error } = await session.supabase
+    .from('links')
+    .update({
+      title,
+      url: finalUrl,
+      custom_css: productMeta,
+    } as Database['public']['Tables']['links']['Update'])
+    .eq('id', id)
+    .eq('user_id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/shop');
+  revalidatePath('/links');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function toggleShopSetting(enabled: boolean, shopTitle?: string, shopLayout?: 'grid' | 'list') {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const newSettings = {
+    ...currentSettings,
+    enable_shop: enabled,
+    shop_title: shopTitle || (currentSettings.shop_title as string) || 'Toko',
+    shop_layout: shopLayout || (currentSettings.shop_layout as 'grid' | 'list') || 'grid',
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: newSettings } as unknown as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/shop');
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
