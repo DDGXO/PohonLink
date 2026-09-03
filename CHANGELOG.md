@@ -1,10 +1,10 @@
 # Changelog
 
-Semua perubahan dan pembaruan pada proyek **Pohonlink** dicatat di dalam dokumen ini.
+Semua perubahan dan pembaruan pada proyek **Pohonlink** dicatat di dalam dokumen ini sesuai **DGXO Versioning & Git Tagging Standard**.
 
 ---
 
-## [2.1.0] - 2026-09-03
+## [v0.3.0] - 2026-09-03
 
 ### ✨ Fitur Baru (Linktree Parity & Media Embeds)
 - **Standard Links & Subtitle**: Dukungan penambahan teks subtitle/deskripsi singkat di bawah judul tombol beserta favicon otomatis.
