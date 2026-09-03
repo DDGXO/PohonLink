@@ -1,20 +1,17 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
-import { getProfileStats, getProfileById } from '@/lib/db/queries';
+import { getAuthenticatedUser } from '@/lib/auth';
+import { getProfileStats } from '@/lib/db/queries';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const auth = await getAuthenticatedUser();
+  if (!auth?.user) redirect('/login');
 
+  const { user, profile } = auth;
   const headersList = await headers();
   const host = headersList.get('host') || 'pohonlink.id';
-  const [profile, stats] = await Promise.all([
-    getProfileById(user.id),
-    getProfileStats(user.id),
-  ]);
+  const stats = await getProfileStats(user.id);
 
   const statCards = [
     { label: 'Total Link', value: stats.totalLinks, icon: '⛓' },

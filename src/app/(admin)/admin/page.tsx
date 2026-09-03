@@ -1,17 +1,27 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 export default async function AdminPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const auth = await getAuthenticatedUser();
+  if (!auth?.user) redirect('/login');
+  if (auth.profile?.role !== 'admin') redirect('/dashboard');
 
-  const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-  const { count: linkCount } = await supabase.from('links').select('*', { count: 'exact', head: true });
-  const { data: clickData } = await supabase.from('links').select('click_count');
-  const totalClicks = (clickData || []).reduce((s, l) => s + (l.click_count || 0), 0);
-  const { count: viewCount } = await supabase.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event', 'pageview');
+  const supabase = await createClient();
+  const [
+    { count: userCount },
+    { count: linkCount },
+    { data: clickData },
+    { count: viewCount },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+    supabase.from('links').select('*', { count: 'exact', head: true }),
+    supabase.from('links').select('click_count'),
+    supabase.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event', 'pageview'),
+  ]);
+
+  const totalClicks = (clickData || []).reduce((s, l) => s + (Number(l.click_count) || 0), 0);
 
   const stats = [
     { label: 'Total User', value: userCount ?? 0, icon: '👥' },

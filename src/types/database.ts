@@ -7,6 +7,10 @@ export interface ProfileSettings {
   show_share_button: boolean;
   show_verified_badge: boolean;
   hide_username?: boolean;
+  avatar_shape?: 'circle' | 'rounded' | 'square';
+  social_position?: 'top' | 'bottom';
+  show_footer?: boolean;
+  custom_footer_text?: string;
   social_links?: Record<string, string>;
 }
 
@@ -27,13 +31,33 @@ export interface Profile {
 
 export interface ThemeConfig {
   preset: string;
-  bg_type: 'color' | 'image';
+  bg_type: 'color' | 'gradient' | 'image' | 'video' | 'animated';
   bg_value: string;
+  gradient_direction?: 'to_bottom' | 'to_top' | 'to_diagonal' | 'radial';
+  gradient_color1?: string;
+  gradient_color2?: string;
   card_bg: string;
   text_color: string;
   btn_radius: string;
-  btn_style: 'solid' | 'outline' | 'ghost';
+  btn_style: 'solid' | 'outline' | 'glass' | 'hard_shadow' | 'soft_shadow';
+  btn_shadow_color?: string;
+  btn_glass_opacity?: number;
+  btn_glass_blur?: number;
+  layout_type?: 'list' | 'grid' | 'carousel';
   font: string;
+  animated_bg?:
+    | 'matrix'
+    | 'ascii_aquarium'
+    | 'starfield'
+    | 'particles'
+    | 'synthwave'
+    | 'aura'
+    | 'cyber_rain'
+    | 'galaxy_spiral'
+    | 'cyber_waves'
+    | 'retro_terminal'
+    | 'neon_embers';
+  video_url?: string;
   custom_css?: string;
   custom_html?: string;
 }

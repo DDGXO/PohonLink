@@ -1,14 +1,13 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { getAuthenticatedUser } from '@/lib/auth';
 import { getAllLinks } from '@/lib/db/queries';
 import LinksClient from './links-client';
 
 export default async function LinksPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const auth = await getAuthenticatedUser();
+  if (!auth?.user) redirect('/login');
 
-  const { data: profile } = await supabase.from('profiles').select('username').eq('id', user.id).single();
+  const { user, profile } = auth;
   const links = await getAllLinks(user.id);
 
   return (

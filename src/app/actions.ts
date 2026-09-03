@@ -145,11 +145,22 @@ export async function updateProfile(formData: FormData) {
   if (rawSettings && typeof rawSettings === 'object') {
     // Privilege escalation prevention: only admin or vip can enable verified badge
     const canVerify = session.profile.role === 'admin' || session.profile.role === 'vip';
+    const validShapes = ['circle', 'rounded', 'square'];
+    const avatarShape = typeof rawSettings.avatar_shape === 'string' && validShapes.includes(rawSettings.avatar_shape)
+      ? rawSettings.avatar_shape as 'circle' | 'rounded' | 'square'
+      : 'circle';
+
+    const socialPosition = rawSettings.social_position === 'bottom' ? 'bottom' : 'top';
+
     updateData.settings = {
       open_links_new_tab: Boolean(rawSettings.open_links_new_tab),
       show_share_button: rawSettings.show_share_button !== false,
       show_verified_badge: canVerify ? Boolean(rawSettings.show_verified_badge) : false,
       hide_username: Boolean(rawSettings.hide_username),
+      avatar_shape: avatarShape,
+      social_position: socialPosition,
+      show_footer: rawSettings.show_footer !== false,
+      custom_footer_text: typeof rawSettings.custom_footer_text === 'string' ? rawSettings.custom_footer_text.trim().slice(0, 100) : undefined,
       social_links: sanitizeSocialLinks(rawSettings.social_links as Record<string, string> | undefined),
     };
   }
@@ -187,21 +198,27 @@ export async function createLink(formData: FormData) {
   const rawUrl = formData.get('url') as string;
   const htmlContent = formData.get('html_content') as string;
   const type = (formData.get('type') as string) || 'link';
+  const subtitle = (formData.get('subtitle') as string)?.trim() || undefined;
+  const schedule_start = (formData.get('schedule_start') as string)?.trim() || undefined;
+  const schedule_end = (formData.get('schedule_end') as string)?.trim() || undefined;
+  const is_locked = formData.get('is_locked') === 'true' || formData.get('is_locked') === 'on';
+  const lock_type = (formData.get('lock_type') as string) || 'pin';
+  const lock_pin = (formData.get('lock_pin') as string)?.trim() || undefined;
 
-  const validTypes = ['link', 'heading', 'text', 'spacer', 'email', 'telephone', 'html'];
+  const validTypes = ['link', 'heading', 'text', 'spacer', 'email', 'telephone', 'html', 'spotify', 'youtube', 'apple_music'];
   if (!validTypes.includes(type)) {
     return { error: 'Tipe link tidak valid' };
   }
 
   // Untuk spacer/heading/html, validasi spesifik
-  if (type === 'link' || type === 'email' || type === 'telephone') {
+  if (type === 'link' || type === 'email' || type === 'telephone' || type === 'spotify' || type === 'youtube' || type === 'apple_music') {
     if (!title?.trim()) return { error: 'Judul tidak boleh kosong' };
     if (!rawUrl?.trim()) return { error: 'URL tidak boleh kosong' };
   }
   if (type === 'heading' && !title?.trim()) return { error: 'Teks heading tidak boleh kosong' };
   if (type === 'html' && !htmlContent?.trim()) return { error: 'Kode HTML tidak boleh kosong' };
 
-  // XSS on URL Prevention: check dangerous schemes (javascript:, data:, vbscript:)
+  // XSS on URL Prevention: check dangerous schemes
   if (rawUrl && isDangerousUrl(rawUrl)) {
     return { error: 'URL menggunakan protokol berbahaya yang dilarang' };
   }
@@ -218,26 +235,48 @@ export async function createLink(formData: FormData) {
   const sort_order = (lastLink?.sort_order ?? -1) + 1;
 
   let finalUrl = rawUrl?.trim() || null;
-  if (type === 'link' && finalUrl) {
+  let dbType: 'link' | 'heading' | 'text' | 'spacer' = 'link';
+  const customCssObj: Record<string, unknown> = {
+    subtitle,
+    schedule_start,
+    schedule_end,
+    is_locked,
+    lock_type: is_locked ? lock_type : undefined,
+    lock_pin: is_locked ? lock_pin : undefined,
+  };
+
+  if (type === 'html') {
+    dbType = 'text';
+    customCssObj.is_html = true;
+    finalUrl = htmlContent?.trim() || null;
+  } else if (type === 'spotify' || type === 'youtube' || type === 'apple_music') {
+    dbType = 'link';
+    customCssObj.embed_type = type;
+    finalUrl = formatSafeUrl(finalUrl || '');
+  } else if (type === 'link' && finalUrl) {
+    dbType = 'link';
     finalUrl = formatSafeUrl(finalUrl);
     if (!finalUrl) return { error: 'URL tidak valid' };
   } else if (type === 'email' && finalUrl) {
+    dbType = 'link';
     if (isDangerousUrl(finalUrl)) return { error: 'Email tidak valid' };
     if (!finalUrl.startsWith('mailto:')) finalUrl = `mailto:${finalUrl}`;
   } else if (type === 'telephone' && finalUrl) {
+    dbType = 'link';
     if (isDangerousUrl(finalUrl)) return { error: 'Nomor telepon tidak valid' };
     if (!finalUrl.startsWith('tel:')) finalUrl = `tel:${finalUrl}`;
-  } else if (type === 'html') {
-    finalUrl = htmlContent?.trim() || null;
+  } else if (type === 'heading' || type === 'text' || type === 'spacer') {
+    dbType = type;
   }
 
   const { error } = await session.supabase.from('links').insert({
     user_id: session.user.id,
     title: title?.trim() || (type === 'html' ? 'Custom HTML' : type),
     url: finalUrl,
-    type: type as import('@/types/database').LinkType,
+    type: dbType,
+    custom_css: customCssObj,
     sort_order,
-  } as Database['public']['Tables']['links']['Insert']);
+  } as unknown as Database['public']['Tables']['links']['Insert']);
 
   if (error) return { error: error.message };
   revalidatePath('/', 'layout');
@@ -251,11 +290,17 @@ export async function updateLink(id: string, formData: FormData) {
   const title = formData.get('title') as string;
   const rawUrl = formData.get('url') as string;
   const htmlContent = formData.get('html_content') as string;
+  const subtitle = (formData.get('subtitle') as string)?.trim() || undefined;
+  const schedule_start = (formData.get('schedule_start') as string)?.trim() || undefined;
+  const schedule_end = (formData.get('schedule_end') as string)?.trim() || undefined;
+  const is_locked = formData.get('is_locked') === 'true' || formData.get('is_locked') === 'on';
+  const lock_type = (formData.get('lock_type') as string) || 'pin';
+  const lock_pin = (formData.get('lock_pin') as string)?.trim() || undefined;
 
   // IDOR fix: ensure link belongs to user before reading/updating
   const { data: existingLink } = await session.supabase
     .from('links')
-    .select('type')
+    .select('type, custom_css')
     .eq('id', id)
     .eq('user_id', session.user.id)
     .single();
@@ -269,25 +314,36 @@ export async function updateLink(id: string, formData: FormData) {
     return { error: 'URL menggunakan protokol berbahaya yang dilarang' };
   }
 
+  const existingMeta = (existingLink.custom_css as Record<string, unknown> | null) || {};
+  const isHtml = existingLink.type === 'text' && existingMeta.is_html;
   let finalUrl = rawUrl?.trim() || null;
-  if (existingLink.type === 'html') {
+  if (isHtml) {
     finalUrl = (htmlContent || rawUrl)?.trim() || null;
   } else if (existingLink.type === 'link' && finalUrl) {
     finalUrl = formatSafeUrl(finalUrl);
     if (!finalUrl) return { error: 'URL tidak valid' };
-  } else if (existingLink.type === 'email' && finalUrl) {
+  } else if (existingLink.type === 'link' && finalUrl && finalUrl.startsWith('mailto:')) {
     if (isDangerousUrl(finalUrl)) return { error: 'Email tidak valid' };
-    if (!finalUrl.startsWith('mailto:')) finalUrl = `mailto:${finalUrl}`;
-  } else if (existingLink.type === 'telephone' && finalUrl) {
+  } else if (existingLink.type === 'link' && finalUrl && finalUrl.startsWith('tel:')) {
     if (isDangerousUrl(finalUrl)) return { error: 'Nomor telepon tidak valid' };
-    if (!finalUrl.startsWith('tel:')) finalUrl = `tel:${finalUrl}`;
   }
+
+  const updatedCustomCss = {
+    ...existingMeta,
+    subtitle,
+    schedule_start,
+    schedule_end,
+    is_locked,
+    lock_type: is_locked ? lock_type : undefined,
+    lock_pin: is_locked ? lock_pin : undefined,
+  };
 
   const { error } = await session.supabase
     .from('links')
     .update({
       title: title?.trim() || null,
       url: finalUrl,
+      custom_css: updatedCustomCss,
     } as Database['public']['Tables']['links']['Update'])
     .eq('id', id)
     .eq('user_id', session.user.id);
@@ -369,6 +425,17 @@ export async function adminBlockUser(userId: string, block: boolean) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Check if target user is an admin
+  const { data: targetProfile } = await adminSupabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (targetProfile?.role === 'admin') {
+    return { error: 'Tidak dapat memblokir akun Admin' };
+  }
+
   const { error } = await adminSupabase
     .from('profiles')
     .update({ is_blocked: block })
@@ -392,6 +459,17 @@ export async function adminDeleteUser(userId: string) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  // Check if target user is an admin
+  const { data: targetProfile } = await adminSupabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (targetProfile?.role === 'admin') {
+    return { error: 'Tidak dapat menghapus akun Admin' };
+  }
 
   const { error } = await adminSupabase.auth.admin.deleteUser(userId);
   if (error) return { error: error.message };
@@ -621,11 +699,20 @@ export async function importUserData(payload: { profile?: Record<string, unknown
     };
     const canVerify = session.profile.role === 'admin' || session.profile.role === 'vip';
 
+    const validShapes = ['circle', 'rounded', 'square'];
+    const avatarShape = typeof settings?.avatar_shape === 'string' && validShapes.includes(settings.avatar_shape)
+      ? settings.avatar_shape as 'circle' | 'rounded' | 'square'
+      : 'circle';
+
     const cleanSettings = settings && typeof settings === 'object' ? {
       open_links_new_tab: Boolean(settings.open_links_new_tab),
       show_share_button: settings.show_share_button !== false,
       show_verified_badge: canVerify ? Boolean(settings.show_verified_badge) : false,
       hide_username: Boolean(settings.hide_username),
+      avatar_shape: avatarShape,
+      social_position: settings.social_position === 'bottom' ? 'bottom' : 'top',
+      show_footer: settings.show_footer !== false,
+      custom_footer_text: typeof settings.custom_footer_text === 'string' ? settings.custom_footer_text.trim().slice(0, 100) : undefined,
       social_links: sanitizeSocialLinks(settings.social_links as Record<string, string> | undefined),
     } : undefined;
 
@@ -646,6 +733,15 @@ export async function importUserData(payload: { profile?: Record<string, unknown
     const inserts = payload.links.slice(0, 100).map((l, index) => {
       const linkType = (typeof l.type === 'string' && validTypes.includes(l.type)) ? l.type : 'link';
       let cleanUrl = typeof l.url === 'string' ? l.url.trim() : null;
+      let dbType: 'link' | 'heading' | 'text' | 'spacer' = 'link';
+      let customCssObj: Record<string, unknown> = {};
+
+      if (linkType === 'html') {
+        dbType = 'text';
+        customCssObj = { is_html: true };
+      } else if (linkType === 'heading' || linkType === 'text' || linkType === 'spacer') {
+        dbType = linkType;
+      }
 
       if (cleanUrl && isDangerousUrl(cleanUrl)) {
         cleanUrl = '#';
@@ -657,7 +753,8 @@ export async function importUserData(payload: { profile?: Record<string, unknown
         user_id: session.user.id,
         title: typeof l.title === 'string' ? l.title.trim().slice(0, 200) : 'Link',
         url: cleanUrl,
-        type: linkType as Database['public']['Tables']['links']['Insert']['type'],
+        type: dbType,
+        custom_css: customCssObj,
         icon: typeof l.icon === 'string' ? l.icon.slice(0, 50) : null,
         is_pinned: Boolean(l.is_pinned),
         is_active: l.is_active !== undefined ? Boolean(l.is_active) : true,

@@ -126,52 +126,56 @@ export default function AdminUsersClient({ users: initial }: { users: Profile[] 
               <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '2px' }}>Bergabung: {new Date(u.created_at).toLocaleDateString('id-ID')}</p>
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-              {u.role !== 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => handleToggleVip(u.id, u.role)}
-                  disabled={isPending}
-                  style={{
-                    padding: '6px 10px',
-                    background: u.role === 'vip' ? 'rgba(59,130,246,0.15)' : 'var(--bg)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px',
-                    color: u.role === 'vip' ? '#3b82f6' : 'var(--text-muted)',
-                    fontSize: '11px', fontWeight: 500, cursor: isPending ? 'not-allowed' : 'pointer',
-                  }}
-                  title="Toggle VIP & Centang Biru"
-                >
-                  {u.role === 'vip' ? '✓ VIP' : '+ Set VIP'}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => handleBlock(u.id, u.is_blocked)}
-                disabled={isPending}
-                style={{
-                  padding: '6px 12px',
-                  background: u.is_blocked ? 'rgba(16,185,129,0.1)' : 'rgba(255,77,77,0.1)',
-                  border: `1px solid ${u.is_blocked ? 'rgba(16,185,129,0.3)' : 'rgba(255,77,77,0.3)'}`,
-                  borderRadius: '6px',
-                  color: u.is_blocked ? 'var(--success)' : 'var(--danger)',
-                  fontSize: '12px', cursor: isPending ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {u.is_blocked ? 'Unblock' : 'Block'}
-              </button>
-              {u.role !== 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => handleDelete(u.id)}
-                  disabled={isPending}
-                  style={{
-                    padding: '6px 12px', background: 'rgba(255,77,77,0.1)',
-                    border: '1px solid rgba(255,77,77,0.3)', borderRadius: '6px',
-                    color: 'var(--danger)', fontSize: '12px', cursor: isPending ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  Hapus
-                </button>
+              {u.role === 'admin' ? (
+                <span style={{ fontSize: '11px', color: 'var(--text-dim)', background: 'var(--bg)', padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                  🛡️ Akun Terlindungi
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleVip(u.id, u.role)}
+                    disabled={isPending}
+                    style={{
+                      padding: '6px 10px',
+                      background: u.role === 'vip' ? 'rgba(59,130,246,0.15)' : 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      color: u.role === 'vip' ? '#3b82f6' : 'var(--text-muted)',
+                      fontSize: '11px', fontWeight: 500, cursor: isPending ? 'not-allowed' : 'pointer',
+                    }}
+                    title="Toggle VIP & Centang Biru"
+                  >
+                    {u.role === 'vip' ? '✓ VIP' : '+ Set VIP'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBlock(u.id, u.is_blocked)}
+                    disabled={isPending}
+                    style={{
+                      padding: '6px 12px',
+                      background: u.is_blocked ? 'rgba(16,185,129,0.1)' : 'rgba(255,77,77,0.1)',
+                      border: `1px solid ${u.is_blocked ? 'rgba(16,185,129,0.3)' : 'rgba(255,77,77,0.3)'}`,
+                      borderRadius: '6px',
+                      color: u.is_blocked ? 'var(--success)' : 'var(--danger)',
+                      fontSize: '12px', cursor: isPending ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {u.is_blocked ? 'Unblock' : 'Block'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(u.id)}
+                    disabled={isPending}
+                    style={{
+                      padding: '6px 12px', background: 'rgba(255,77,77,0.1)',
+                      border: '1px solid rgba(255,77,77,0.3)', borderRadius: '6px',
+                      color: 'var(--danger)', fontSize: '12px', cursor: isPending ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Hapus
+                  </button>
+                </>
               )}
             </div>
           </div>

@@ -1,18 +1,14 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { getAuthenticatedUser } from '@/lib/auth';
 import { signOut } from '@/app/actions';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const auth = await getAuthenticatedUser();
+  if (!auth?.user) redirect('/login');
+  if (auth.profile?.is_blocked) redirect('/blocked');
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username, display_name, role')
-    .eq('id', user.id)
-    .single();
+  const { user, profile } = auth;
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: '▦' },
@@ -95,6 +91,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '9px 12px', borderRadius: '8px',
@@ -110,6 +107,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             {profile?.role === 'admin' && (
               <Link
                 href="/admin"
+                prefetch={true}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '9px 12px', borderRadius: '8px',
@@ -173,6 +171,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link
             key={item.href}
             href={item.href}
+            prefetch={true}
             style={{
               display: 'flex',
               flexDirection: 'column',
@@ -194,6 +193,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {profile?.role === 'admin' && (
           <Link
             href="/admin"
+            prefetch={true}
             style={{
               display: 'flex',
               flexDirection: 'column',

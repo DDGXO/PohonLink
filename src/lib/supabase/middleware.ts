@@ -54,36 +54,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Blocked check for logged-in users on protected routes.
-  if (pathname !== '/blocked') {
-    const { data: profileCheck } = await supabase
-      .from('profiles')
-      .select('is_blocked')
-      .eq('id', user.id)
-      .single();
-
-    if (profileCheck?.is_blocked) {
-      await supabase.auth.signOut();
-      const url = request.nextUrl.clone();
-      url.pathname = '/blocked';
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // Admin role check only on /admin routes.
-  if (pathname.startsWith('/admin')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.role !== 'admin') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
-      return NextResponse.redirect(url);
-    }
-  }
-
   return supabaseResponse;
 }

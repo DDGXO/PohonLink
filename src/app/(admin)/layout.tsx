@@ -1,19 +1,11 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, username')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin') redirect('/dashboard');
+  const auth = await getAuthenticatedUser();
+  if (!auth?.user) redirect('/login');
+  if (auth.profile?.role !== 'admin') redirect('/dashboard');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -62,7 +54,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               { href: '/admin', label: 'Overview', icon: '▦' },
               { href: '/admin/users', label: 'Pengguna', icon: '👥' },
             ].map(item => (
-              <Link key={item.href} href={item.href} style={{
+              <Link key={item.href} href={item.href} prefetch={true} style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '9px 12px', borderRadius: '8px',
                 fontSize: '13px', fontWeight: 500,
@@ -71,7 +63,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <span style={{ fontSize: '14px' }}>{item.icon}</span>{item.label}
               </Link>
             ))}
-            <Link href="/dashboard" style={{
+            <Link href="/dashboard" prefetch={true} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '9px 12px', borderRadius: '8px',
               fontSize: '13px', fontWeight: 500,

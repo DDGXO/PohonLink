@@ -1,27 +1,21 @@
 export default function DashboardLoading() {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '50vh',
-      color: 'var(--text-dim)',
-      fontSize: '14px',
-      gap: '10px',
-    }}>
-      <span
-        style={{
-          width: '18px',
-          height: '18px',
-          border: '2px solid var(--border-hover)',
-          borderTopColor: 'var(--accent)',
-          borderRadius: '50%',
-          animation: 'spin 0.7s linear infinite',
-          display: 'inline-block',
-        }}
-      />
-      Memuat...
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div style={{ width: '100%', animation: 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
+      {/* Header Skeleton */}
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ width: '180px', height: '26px', background: 'var(--surface)', borderRadius: '6px', marginBottom: '8px' }} />
+        <div style={{ width: '260px', height: '16px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }} />
+      </div>
+
+      {/* Grid Content Skeleton */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+        <div style={{ height: '110px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }} />
+        <div style={{ height: '110px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }} />
+        <div style={{ height: '110px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }} />
+      </div>
+
+      {/* Main Section Skeleton */}
+      <div style={{ height: '240px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }} />
     </div>
   );
 }

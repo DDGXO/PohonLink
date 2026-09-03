@@ -12,6 +12,7 @@ import {
 } from '@/app/actions';
 
 import type { ProfileSettings } from '@/types/database';
+import ImageCropperModal from '@/components/image-cropper-modal';
 
 interface Props {
   email: string;
@@ -99,6 +100,8 @@ export default function SettingsClient({ email, username, displayName, bio, avat
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [usernameMsg, setUsernameMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [preferencesMsg, setPreferencesMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [avatarShapeMsg, setAvatarShapeMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [backupMsg, setBackupMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [localSettings, setLocalSettings] = useState(settings);
   const [isPending, startTransition] = useTransition();
@@ -111,19 +114,36 @@ export default function SettingsClient({ email, username, displayName, bio, avat
     color: 'var(--text)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' as const,
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileMsg({ type: 'error', text: 'Ukuran foto maksimal 5MB' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handlePerformCroppedAvatar = (blob: Blob) => {
+    setCropImageSrc(null);
     startTransition(async () => {
       const fd = new FormData();
-      fd.append('avatar', file);
+      fd.append('avatar', blob, 'avatar.webp');
       const res = await uploadAvatar(fd);
       if (res?.error) {
         setProfileMsg({ type: 'error', text: res.error });
       } else if (res?.avatar_url) {
         setAvatarUrl(res.avatar_url);
-        setProfileMsg({ type: 'success', text: 'Foto profil berhasil diunggah!' });
+        setProfileMsg({ type: 'success', text: 'Foto profil berhasil dipotong & diunggah!' });
       }
     });
   };
@@ -159,6 +179,36 @@ export default function SettingsClient({ email, username, displayName, bio, avat
 
   const handleSettingToggle = (key: string, val: boolean) => {
     setLocalSettings(prev => ({ ...prev, [key]: val }));
+  };
+
+  const handleSavePreferences = () => {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append('display_name', displayName);
+      fd.append('bio', bio);
+      fd.append('settings', JSON.stringify(localSettings));
+      const res = await updateProfile(fd);
+      if (res?.error) setPreferencesMsg({ type: 'error', text: res.error });
+      else {
+        setPreferencesMsg({ type: 'success', text: 'Preferensi halaman berhasil disimpan!' });
+        setTimeout(() => setPreferencesMsg(null), 3000);
+      }
+    });
+  };
+
+  const handleSaveAvatarShape = () => {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append('display_name', displayName);
+      fd.append('bio', bio);
+      fd.append('settings', JSON.stringify(localSettings));
+      const res = await updateProfile(fd);
+      if (res?.error) setAvatarShapeMsg({ type: 'error', text: res.error });
+      else {
+        setAvatarShapeMsg({ type: 'success', text: 'Bentuk foto/logo berhasil disimpan!' });
+        setTimeout(() => setAvatarShapeMsg(null), 3000);
+      }
+    });
   };
 
   const handleSocialChange = (key: string, val: string) => {
@@ -233,20 +283,37 @@ export default function SettingsClient({ email, username, displayName, bio, avat
       {/* Avatar Section */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px' }}>
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '16px' }}>Foto Profil (Avatar)</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '18px' }}>
           {avatarUrl ? (
             <img
               src={avatarUrl}
               alt="Avatar"
-              style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border-hover)' }}
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: localSettings?.avatar_shape === 'circle' || !localSettings?.avatar_shape ? '50%' : localSettings.avatar_shape === 'rounded' ? '14px' : '4px',
+                objectFit: localSettings?.avatar_shape === 'square' ? 'contain' : 'cover',
+                border: localSettings?.avatar_shape === 'square' ? '1px dashed var(--border-hover)' : '2px solid var(--border-hover)',
+                background: localSettings?.avatar_shape === 'square' ? 'transparent' : 'var(--bg)',
+              }}
             />
           ) : (
-            <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: localSettings?.avatar_shape === 'circle' || !localSettings?.avatar_shape ? '50%' : localSettings.avatar_shape === 'rounded' ? '14px' : '4px',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '28px'
+            }}>
               🌿
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <input type="file" ref={fileInputRef} onChange={handleAvatarChange} accept="image/*" style={{ display: 'none' }} />
+            <input type="file" ref={fileInputRef} onChange={handleAvatarFileSelect} accept="image/*" style={{ display: 'none' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="button"
@@ -254,7 +321,7 @@ export default function SettingsClient({ email, username, displayName, bio, avat
                 disabled={isPending}
                 style={{ padding: '8px 16px', background: 'var(--accent)', color: '#000', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
               >
-                {isPending ? 'Mengunggah...' : 'Ganti Foto'}
+                {isPending ? 'Mengunggah...' : 'Ganti & Crop Foto'}
               </button>
               {avatarUrl && (
                 <button
@@ -267,7 +334,69 @@ export default function SettingsClient({ email, username, displayName, bio, avat
                 </button>
               )}
             </div>
-            <p style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Format: JPG, PNG, WEBP. Maksimal 2MB.</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Format: JPG, PNG, WEBP. Maksimal 5MB.</p>
+          </div>
+        </div>
+
+        {/* Shape selector */}
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+            Bentuk Tampilan Foto / Logo:
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            {[
+              { id: 'circle' as const, label: '⚪ Bulat' },
+              { id: 'rounded' as const, label: '🔲 Melengkung' },
+              { id: 'square' as const, label: '⏹️ Kotak Transparan' },
+            ].map((shape) => {
+              const active = (localSettings?.avatar_shape || 'circle') === shape.id;
+              return (
+                <button
+                  key={shape.id}
+                  type="button"
+                  onClick={() => {
+                    setLocalSettings(prev => ({ ...prev, avatar_shape: shape.id }));
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    background: active ? 'var(--accent-dim)' : 'var(--bg)',
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '6px',
+                    color: active ? 'var(--accent)' : 'var(--text-muted)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {shape.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {avatarShapeMsg && (
+            <div style={{
+              padding: '8px 12px', borderRadius: '6px', marginTop: '12px', fontSize: '12px',
+              background: avatarShapeMsg.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(255,77,77,0.1)',
+              border: `1px solid ${avatarShapeMsg.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(255,77,77,0.3)'}`,
+              color: avatarShapeMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
+            }}>{avatarShapeMsg.text}</div>
+          )}
+
+          <div style={{ marginTop: '12px' }}>
+            <button
+              type="button"
+              onClick={handleSaveAvatarShape}
+              disabled={isPending}
+              style={{
+                padding: '8px 16px', background: 'var(--surface)',
+                border: '1px solid var(--border-hover)', borderRadius: '6px',
+                color: 'var(--text)', fontSize: '12px', fontWeight: 600,
+                cursor: isPending ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isPending ? 'Menyimpan...' : 'Simpan Bentuk Foto'}
+            </button>
           </div>
         </div>
       </div>
@@ -353,15 +482,102 @@ export default function SettingsClient({ email, username, displayName, bio, avat
           <ToggleRow
             label="Sembunyikan handle @username"
             desc="Hanya tampilkan Nama dan Bio di halaman profil"
-            checked={localSettings?.hide_username !== false}
+            checked={localSettings?.hide_username || false}
             onChange={val => handleSettingToggle('hide_username', val)}
           />
+          <ToggleRow
+            label="Tampilkan Footer"
+            desc="Tampilkan atribusi 'Dibuat dengan Pohonlink' atau teks kustom di bagian bawah profil"
+            checked={localSettings?.show_footer ?? true}
+            onChange={val => handleSettingToggle('show_footer', val)}
+          />
+          {(localSettings?.show_footer ?? true) && (
+            <div style={{ paddingLeft: '12px', borderLeft: '2px solid var(--accent)', marginTop: '2px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                Kustom Teks Footer (Opsional)
+              </label>
+              <input
+                type="text"
+                placeholder="Kosongkan untuk default (🌿 Dibuat dengan Pohonlink)"
+                value={localSettings?.custom_footer_text || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  setLocalSettings(prev => ({ ...prev, custom_footer_text: val }));
+                }}
+                maxLength={100}
+                style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+              />
+              <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                Maksimal 100 karakter. Kosongkan jika ingin menampilkan branding default.
+              </p>
+            </div>
+          )}
+
+          {preferencesMsg && (
+            <div style={{
+              padding: '10px 14px', borderRadius: '8px', fontSize: '13px',
+              background: preferencesMsg.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(255,77,77,0.1)',
+              border: `1px solid ${preferencesMsg.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(255,77,77,0.3)'}`,
+              color: preferencesMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
+            }}>{preferencesMsg.text}</div>
+          )}
+
+          <div>
+            <button
+              type="button"
+              onClick={handleSavePreferences}
+              disabled={isPending}
+              style={{
+                padding: '10px 20px', background: 'var(--accent)', color: '#000',
+                borderRadius: '8px', border: 'none', fontSize: '13px',
+                fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isPending ? 'Menyimpan...' : 'Simpan Preferensi'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Social Media Links */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '24px' }}>
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>Ikon Media Sosial</h2>
+        <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '16px' }}>Tampilkan ikon media sosial transparan di profil kamu.</p>
+
+        {/* Social Position Switcher */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
+            Posisi Deretan Ikon Media Sosial:
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+            {[
+              { id: 'top' as const, label: '⬆️ Bagian Atas', desc: 'Di bawah bio & foto profil' },
+              { id: 'bottom' as const, label: '⬇️ Bagian Bawah', desc: 'Di atas footer halaman' },
+            ].map(pos => {
+              const active = (localSettings.social_position || 'top') === pos.id;
+              return (
+                <button
+                  key={pos.id}
+                  type="button"
+                  onClick={() => setLocalSettings(prev => ({ ...prev, social_position: pos.id }))}
+                  style={{
+                    padding: '10px 12px',
+                    background: active ? 'var(--accent-dim)' : 'var(--bg)',
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '8px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)', margin: '0 0 2px' }}>{pos.label}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0 }}>{pos.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="responsive-grid-2col">
           {[
             { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/...' },
@@ -391,7 +607,7 @@ export default function SettingsClient({ email, username, displayName, bio, avat
           type="button"
           onClick={handleSaveSocials}
           disabled={isPending}
-          style={{ marginTop: '16px', padding: '8px 18px', background: 'var(--accent)', color: '#000', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer' }}
+          style={{ marginTop: '16px', padding: '10px 20px', background: 'var(--accent)', color: '#000', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: isPending ? 'not-allowed' : 'pointer' }}
         >
           {isPending ? 'Menyimpan...' : 'Simpan Media Sosial'}
         </button>
@@ -431,6 +647,17 @@ export default function SettingsClient({ email, username, displayName, bio, avat
       </div>
 
       <DeleteAccountSection />
+
+      {cropImageSrc && (
+        <ImageCropperModal
+          imageSrc={cropImageSrc}
+          aspectRatio={1}
+          circularCrop={true}
+          title="Crop Foto Profil"
+          onCrop={handlePerformCroppedAvatar}
+          onCancel={() => setCropImageSrc(null)}
+        />
+      )}
     </div>
   );
 }

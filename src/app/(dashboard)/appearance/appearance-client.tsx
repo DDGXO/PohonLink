@@ -3,6 +3,50 @@
 import { useState, useTransition, useRef } from 'react';
 import { updateTheme, uploadBackground, removeBackground } from '@/app/actions';
 import type { ThemeConfig } from '@/types/database';
+import ImageCropperModal from '@/components/image-cropper-modal';
+
+const VIDEO_PRESETS = [
+  { name: 'Nebula Space', label: '🌌 Nebula', url: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-1610-large.mp4' },
+  { name: 'Rainy Dusk', label: '🌧️ Hujan', url: 'https://assets.mixkit.co/videos/preview/mixkit-rain-falling-on-the-water-of-a-lake-seen-up-close-18312-large.mp4' },
+  { name: 'Cyber Neon', label: '⚡ Neon Laser', url: 'https://assets.mixkit.co/videos/preview/mixkit-abstract-laser-lights-background-animation-32508-large.mp4' },
+  { name: 'Forest Mist', label: '🌲 Hutan Kabut', url: 'https://assets.mixkit.co/videos/preview/mixkit-forest-stream-in-the-sunlight-529-large.mp4' },
+];
+
+const ANIMATED_BG_TEMPLATES = [
+  { id: 'matrix' as const, label: '🟩 Matrix Rain', desc: 'Hujan kode digital hijau Matrix' },
+  { id: 'ascii_aquarium' as const, label: '🐟 ASCII Aquarium', desc: 'Akuarium ikan ASCII berenang' },
+  { id: 'starfield' as const, label: '✨ Starfield 3D', desc: 'Galaksi bintang 3D hyperspace' },
+  { id: 'particles' as const, label: '🕸️ Particle Mesh', desc: 'Jaringan partikel konstelasi dinamis' },
+  { id: 'synthwave' as const, label: '🌆 Synthwave 80s', desc: 'Grid neon retro perspektif senja' },
+  { id: 'aura' as const, label: '🔮 Ambient Aura', desc: 'Cahaya aura lembut mengapung' },
+  { id: 'cyber_rain' as const, label: '🌧️ Cyberpunk Rain', desc: 'Hujan neon cyan dengan riak air' },
+  { id: 'galaxy_spiral' as const, label: '🌌 Spiral Galaxy', desc: 'Pusaran galaksi bintang kosmik berputar' },
+  { id: 'cyber_waves' as const, label: '🧬 Cyber Waveform', desc: 'Pita gelombang neon berosilasi' },
+  { id: 'retro_terminal' as const, label: '👾 Retro Terminal', desc: 'Layar hacker CRT scanline berkedip' },
+  { id: 'neon_embers' as const, label: '🔥 Neon Embers', desc: 'Percikan api neon & kunang-kunang' },
+];
+
+const GRADIENT_PRESETS = [
+  { name: 'Sunset Glow', dir: 'to_bottom' as const, c1: '#ff512f', c2: '#dd2476' },
+  { name: 'Cyber Aurora', dir: 'to_diagonal' as const, c1: '#00f2fe', c2: '#4facfe' },
+  { name: 'Midnight Velvet', dir: 'to_bottom' as const, c1: '#0f0c29', c2: '#302b63' },
+  { name: 'Neon Dusk', dir: 'radial' as const, c1: '#ec4899', c2: '#18181b' },
+  { name: 'Emerald Forest', dir: 'to_bottom' as const, c1: '#052e16', c2: '#14532d' },
+];
+
+const BUTTON_STYLE_OPTIONS = [
+  { id: 'solid' as const, label: '⬛ Solid Fill', desc: 'Latar pekat standar' },
+  { id: 'outline' as const, label: '🔲 Outline Garis', desc: 'Border garis transparan' },
+  { id: 'glass' as const, label: '🪟 Glassmorphism', desc: 'Efek kaca blur' },
+  { id: 'hard_shadow' as const, label: '🧱 Hard Shadow (3D)', desc: 'Bayangan retro pop tegas' },
+  { id: 'soft_shadow' as const, label: '✨ Soft Shadow / Glow', desc: 'Bayangan lembut melayang' },
+];
+
+const LAYOUT_OPTIONS = [
+  { id: 'list' as const, label: '📋 Stack Klasik', desc: 'Tumpukan link vertikal penuh' },
+  { id: 'grid' as const, label: '▦ Grid Kompak', desc: 'Grid 2 kolom modern' },
+  { id: 'carousel' as const, label: '🎠 Carousel Slider', desc: 'Kartu geser horizontal' },
+];
 
 const PRESETS: { name: string; label: string; config: Partial<ThemeConfig> }[] = [
   { name: 'default', label: '🌑 Dark', config: { bg_value: '#0a0a0a', card_bg: '#161616', text_color: '#f0ece4' } },
@@ -122,6 +166,8 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
   const bgInputRef = useRef<HTMLInputElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  const [cropBgSrc, setCropBgSrc] = useState<string | null>(null);
+
   const refreshPreview = () => {
     if (iframeRef.current) iframeRef.current.src = iframeRef.current.src;
   };
@@ -141,20 +187,35 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
     });
   };
 
-  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBgFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 8 * 1024 * 1024) {
+      setBgMsg({ type: 'error', text: 'Ukuran file maksimal 8MB' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropBgSrc(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handlePerformCroppedBg = (blob: Blob) => {
+    setCropBgSrc(null);
     startTransition(async () => {
       const fd = new FormData();
-      fd.append('background', file);
+      fd.append('background', blob, 'background.webp');
       const res = await uploadBackground(fd);
       if (res?.error) {
         setBgMsg({ type: 'error', text: res.error });
       } else if (res?.bg_url) {
         setBgUrl(res.bg_url);
         setTheme(prev => ({ ...prev, bg_type: 'image' }));
-        setBgMsg({ type: 'success', text: 'Gambar latar berhasil diunggah!' });
+        setBgMsg({ type: 'success', text: 'Gambar latar berhasil dipotong & diunggah!' });
         refreshPreview();
       }
     });
@@ -199,9 +260,41 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
           </div>
         </div>
 
-        {/* Custom Background Image */}
+        {/* Custom Background (Color / Gradient / Image with Crop / Video / Animated) */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Gambar Latar Kustom (Background)</h3>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Tipe Latar Belakang</h3>
+          
+          {/* Mode Tabs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '16px' }}>
+            {[
+              { type: 'color' as const, label: '🎨 Warna' },
+              { type: 'gradient' as const, label: '🌈 Gradient' },
+              { type: 'image' as const, label: '🖼️ Gambar' },
+              { type: 'video' as const, label: '🎬 Video' },
+              { type: 'animated' as const, label: '✨ Efek' },
+            ].map(tab => (
+              <button
+                key={tab.type}
+                type="button"
+                onClick={() => setTheme(prev => ({ ...prev, bg_type: tab.type, animated_bg: prev.animated_bg || 'matrix' }))}
+                style={{
+                  padding: '9px 4px',
+                  background: theme.bg_type === tab.type ? 'var(--accent)' : 'var(--bg)',
+                  color: theme.bg_type === tab.type ? '#000' : 'var(--text-muted)',
+                  border: `1px solid ${theme.bg_type === tab.type ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  textAlign: 'center',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
           {bgMsg && (
             <div style={{
               padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '12px',
@@ -210,37 +303,361 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
               color: bgMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
             }}>{bgMsg.text}</div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {bgUrl && (
-              <div style={{
-                width: '64px', height: '64px', borderRadius: '8px',
-                backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center',
-                border: '1px solid var(--border)'
-              }} />
-            )}
-            <input type="file" ref={bgInputRef} onChange={handleBgUpload} accept="image/*" style={{ display: 'none' }} />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => bgInputRef.current?.click()}
-                disabled={isPending}
-                style={{ padding: '8px 16px', background: 'var(--accent)', color: '#000', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                {isPending ? 'Mengunggah...' : bgUrl ? 'Ganti Gambar' : 'Unggah Gambar'}
-              </button>
-              {bgUrl && (
-                <button
-                  type="button"
-                  onClick={handleRemoveBg}
-                  disabled={isPending}
-                  style={{ padding: '8px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--danger)', fontSize: '13px', cursor: 'pointer' }}
-                >
-                  Hapus
-                </button>
-              )}
+
+          {/* Mode: Gradient */}
+          {theme.bg_type === 'gradient' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Arah Gradient:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {[
+                    { id: 'to_bottom' as const, label: 'Bawah ↓' },
+                    { id: 'to_top' as const, label: 'Atas ↑' },
+                    { id: 'to_diagonal' as const, label: 'Diagonal ↗' },
+                    { id: 'radial' as const, label: 'Radial 🔘' },
+                  ].map(dir => (
+                    <button
+                      key={dir.id}
+                      type="button"
+                      onClick={() => setTheme(prev => ({ ...prev, gradient_direction: dir.id }))}
+                      style={{
+                        padding: '8px 4px',
+                        background: (theme.gradient_direction || 'to_bottom') === dir.id ? 'var(--accent)' : 'var(--bg)',
+                        color: (theme.gradient_direction || 'to_bottom') === dir.id ? '#000' : 'var(--text-muted)',
+                        border: `1px solid ${(theme.gradient_direction || 'to_bottom') === dir.id ? 'var(--accent)' : 'var(--border)'}`,
+                        borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', textAlign: 'center',
+                      }}
+                    >
+                      {dir.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gradient Color Pickers */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Warna Awal (Color 1)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="text"
+                      value={theme.gradient_color1 || '#ff512f'}
+                      onChange={(e) => setTheme(prev => ({ ...prev, gradient_color1: e.target.value }))}
+                      style={{ width: '100%', padding: '6px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}
+                    />
+                    <input
+                      type="color"
+                      value={theme.gradient_color1 || '#ff512f'}
+                      onChange={(e) => setTheme(prev => ({ ...prev, gradient_color1: e.target.value }))}
+                      style={{ width: '36px', height: '36px', borderRadius: '6px', border: 'none', cursor: 'pointer', padding: '2px' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Warna Akhir (Color 2)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <input
+                      type="text"
+                      value={theme.gradient_color2 || '#dd2476'}
+                      onChange={(e) => setTheme(prev => ({ ...prev, gradient_color2: e.target.value }))}
+                      style={{ width: '100%', padding: '6px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}
+                    />
+                    <input
+                      type="color"
+                      value={theme.gradient_color2 || '#dd2476'}
+                      onChange={(e) => setTheme(prev => ({ ...prev, gradient_color2: e.target.value }))}
+                      style={{ width: '36px', height: '36px', borderRadius: '6px', border: 'none', cursor: 'pointer', padding: '2px' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Preset Gradients */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>Preset Gradient Populer:</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {GRADIENT_PRESETS.map((gp) => (
+                    <button
+                      key={gp.name}
+                      type="button"
+                      onClick={() => setTheme(prev => ({ ...prev, gradient_direction: gp.dir, gradient_color1: gp.c1, gradient_color2: gp.c2 }))}
+                      style={{
+                        padding: '6px 12px',
+                        background: `linear-gradient(135deg, ${gp.c1}, ${gp.c2})`,
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                      }}
+                    >
+                      {gp.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* Mode: Animated Effects */}
+          {theme.bg_type === 'animated' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Pilih Template Efek Animasi (Canvas 60FPS):
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                {ANIMATED_BG_TEMPLATES.map((tmpl) => {
+                  const active = theme.animated_bg === tmpl.id;
+                  return (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      onClick={() => setTheme(prev => ({ ...prev, bg_type: 'animated', animated_bg: tmpl.id }))}
+                      style={{
+                        padding: '12px',
+                        background: active ? 'var(--accent-dim)' : 'var(--bg)',
+                        border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <p style={{ fontSize: '13px', fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)', margin: '0 0 4px' }}>
+                        {tmpl.label}
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0 }}>
+                        {tmpl.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Mode: Image */}
+          {theme.bg_type === 'image' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                {bgUrl && (
+                  <div style={{
+                    width: '64px', height: '64px', borderRadius: '8px',
+                    backgroundImage: `url(${bgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                    border: '1px solid var(--border)'
+                  }} />
+                )}
+                <input type="file" ref={bgInputRef} onChange={handleBgFileSelect} accept="image/*" style={{ display: 'none' }} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => bgInputRef.current?.click()}
+                    disabled={isPending}
+                    style={{ padding: '8px 16px', background: 'var(--accent)', color: '#000', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {isPending ? 'Mengunggah...' : bgUrl ? 'Ganti & Crop Gambar' : 'Unggah & Crop Gambar'}
+                  </button>
+                  {bgUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveBg}
+                      disabled={isPending}
+                      style={{ padding: '8px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--danger)', fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px' }}>JPG, PNG, WEBP. Maksimal 8MB. Gambar akan dipotong secara proporsional.</p>
+            </div>
+          )}
+
+          {/* Mode: Video */}
+          {theme.bg_type === 'video' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  URL Video (.mp4 / .webm langsung)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/ambient-loop.mp4"
+                  value={theme.video_url || ''}
+                  onChange={(e) => setTheme(prev => ({ ...prev, video_url: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    color: 'var(--text)',
+                    fontSize: '13px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  Preset Video Ambient:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  {VIDEO_PRESETS.map((vp) => (
+                    <button
+                      key={vp.name}
+                      type="button"
+                      onClick={() => setTheme(prev => ({ ...prev, bg_type: 'video', video_url: vp.url }))}
+                      style={{
+                        padding: '8px 10px',
+                        background: theme.video_url === vp.url ? 'var(--accent-dim)' : 'var(--bg)',
+                        border: `1px solid ${theme.video_url === vp.url ? 'var(--accent)' : 'var(--border)'}`,
+                        borderRadius: '6px',
+                        color: theme.video_url === vp.url ? 'var(--accent)' : 'var(--text-muted)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {vp.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mode: Color */}
+          {theme.bg_type === 'color' && (
+            <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: 0 }}>
+              Warna latar solid diatur pada panel &quot;Warna&quot; di bawah ini.
+            </p>
+          )}
+        </div>
+
+        {/* Layout Selection */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Tata Letak Konten (Layout)</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+            {LAYOUT_OPTIONS.map(opt => {
+              const active = (theme.layout_type || 'list') === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setTheme(prev => ({ ...prev, layout_type: opt.id }))}
+                  style={{
+                    padding: '14px 10px',
+                    background: active ? 'var(--accent-dim)' : 'var(--bg)',
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)', margin: '0 0 4px' }}>{opt.label}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0 }}>{opt.desc}</p>
+                </button>
+              );
+            })}
           </div>
-          <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px' }}>JPG, PNG, WEBP. Maksimal 5MB. Menimpa warna latar.</p>
+        </div>
+
+        {/* Button Style Types */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Gaya & Efek Tombol</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '14px' }}>
+            {BUTTON_STYLE_OPTIONS.map(btnOpt => {
+              const active = (theme.btn_style || 'solid') === btnOpt.id;
+              return (
+                <button
+                  key={btnOpt.id}
+                  type="button"
+                  onClick={() => setTheme(prev => ({ ...prev, btn_style: btnOpt.id }))}
+                  style={{
+                    padding: '12px',
+                    background: active ? 'var(--accent-dim)' : 'var(--bg)',
+                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)', margin: '0 0 4px' }}>{btnOpt.label}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: 0 }}>{btnOpt.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Glassmorphism settings if glass is chosen */}
+          {theme.btn_style === 'glass' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
+                  <label style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Tingkat Transparansi Kaca (Opacity)</label>
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{theme.btn_glass_opacity !== undefined ? theme.btn_glass_opacity : 15}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={theme.btn_glass_opacity !== undefined ? theme.btn_glass_opacity : 15}
+                  onChange={(e) => setTheme(prev => ({ ...prev, btn_glass_opacity: Number(e.target.value) }))}
+                  style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
+                  <label style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Ketajaman Blur Latar (Backdrop Blur)</label>
+                  <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{theme.btn_glass_blur !== undefined ? theme.btn_glass_blur : 16}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  value={theme.btn_glass_blur !== undefined ? theme.btn_glass_blur : 16}
+                  onChange={(e) => setTheme(prev => ({ ...prev, btn_glass_blur: Number(e.target.value) }))}
+                  style={{ width: '100%', cursor: 'pointer', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: '4px 0 0' }}>
+                💡 Warna kaca (tint) mengikuti <b>Warna Tombol</b> di panel bawah.
+              </p>
+            </div>
+          )}
+
+          {/* Shadow color picker if hard_shadow or soft_shadow */}
+          {(theme.btn_style === 'hard_shadow' || theme.btn_style === 'soft_shadow') && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Warna Bayangan Tombol (Shadow)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  type="text"
+                  value={theme.btn_shadow_color || '#3b82f6'}
+                  onChange={(e) => setTheme(prev => ({ ...prev, btn_shadow_color: e.target.value }))}
+                  style={{ width: '80px', padding: '5px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', fontSize: '12px' }}
+                />
+                <input
+                  type="color"
+                  value={theme.btn_shadow_color || '#3b82f6'}
+                  onChange={(e) => setTheme(prev => ({ ...prev, btn_shadow_color: e.target.value }))}
+                  style={{ width: '32px', height: '32px', borderRadius: '6px', border: 'none', cursor: 'pointer', padding: '2px' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Colors */}
@@ -248,7 +665,7 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
           <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Warna</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {[
-              { label: 'Warna Latar (jika tanpa gambar)', key: 'bg_value' as keyof ThemeConfig },
+              { label: 'Warna Latar (jika tanpa gambar/gradient)', key: 'bg_value' as keyof ThemeConfig },
               { label: 'Warna Tombol', key: 'card_bg' as keyof ThemeConfig },
               { label: 'Warna Teks', key: 'text_color' as keyof ThemeConfig },
             ].map(({ label, key }) => (
@@ -257,7 +674,7 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
                     type="text"
-                    value={String(theme[key])}
+                    value={String(theme[key] || '')}
                     onChange={(e) => setTheme(prev => ({ ...prev, [key]: e.target.value }))}
                     style={{
                       width: '90px', padding: '6px 10px', background: 'var(--bg)',
@@ -268,7 +685,7 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
                   />
                   <input
                     type="color"
-                    value={String(theme[key])}
+                    value={String(theme[key] || '#000000')}
                     onChange={(e) => setTheme(prev => ({ ...prev, [key]: e.target.value }))}
                     style={{ width: '36px', height: '36px', borderRadius: '6px', border: 'none', cursor: 'pointer', padding: '2px' }}
                   />
@@ -280,7 +697,7 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
 
         {/* Border Radius */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '20px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Bentuk Tombol</h3>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '14px' }}>Sudut Tombol (Radius)</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             {RADIUS_OPTIONS.map(opt => (
               <button
@@ -501,7 +918,7 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
           }}>
             <iframe
               ref={iframeRef}
-              src={`/@${username}`}
+              src={`/@${username}?preview=true`}
               style={{ width: '100%', height: '100%', border: 'none' }}
               title="Live preview"
               onLoad={(e) => {
@@ -518,6 +935,17 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
           </div>
         </div>
       </div>
+
+      {cropBgSrc && (
+        <ImageCropperModal
+          imageSrc={cropBgSrc}
+          aspectRatio={16 / 9}
+          circularCrop={false}
+          title="Crop Gambar Latar (Background)"
+          onCrop={handlePerformCroppedBg}
+          onCancel={() => setCropBgSrc(null)}
+        />
+      )}
     </div>
   );
 }
