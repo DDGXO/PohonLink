@@ -87,6 +87,7 @@ Dokumentasi lengkap standar DGXO tersedia pada repositori ini:
 - [TASK.md](TASK.md): Checklist pelacakan fase pengembangan dan cursor kerja.
 - [DECISIONS.md](DECISIONS.md): Log keputusan arsitektur terkunci (append-only).
 - [CHANGELOG.md](CHANGELOG.md): Riwayat rilis dan catatan pembaruan versi.
+- [VERSIONING.md](VERSIONING.md): Standar penomoran versi (Odometer style) dan SOP rilis git tag DGXO.
 - [CONVENTIONS.md](CONVENTIONS.md): Standar penulisan kode, error handling, dan penamaan.
 - [SCOPE.md](SCOPE.md): Cakupan fitur in-scope v1.0.0 dan fitur yang ditunda.
 - [ARCHITECTURE.md](ARCHITECTURE.md): Diagram alur arsitektur, skema DB, RLS, dan storage.
