@@ -35,7 +35,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {/* Logo */}
           <div style={{ padding: '0 20px 20px', borderBottom: '1px solid var(--border)' }}>
             <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-              <span style={{ fontSize: '20px' }}>🌿</span>
+              <img
+                src="/logo.svg"
+                alt="Pohonlink"
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  display: 'block',
+                }}
+              />
               <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>Pohonlink</span>
             </Link>
           </div>

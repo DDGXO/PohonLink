@@ -63,8 +63,17 @@ export default function DashboardMobileNav({ navItems, profile, userEmail }: Pro
             ☰
           </button>
 
-          <Link href="/dashboard" onClick={handleClose} style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}>
-            <span style={{ fontSize: '18px' }}>🌿</span>
+          <Link href="/dashboard" onClick={handleClose} style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+            <img
+              src="/logo.svg"
+              alt="Pohonlink"
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '5px',
+                display: 'block',
+              }}
+            />
             <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>Pohonlink</span>
           </Link>
         </div>
@@ -127,7 +136,16 @@ export default function DashboardMobileNav({ navItems, profile, userEmail }: Pro
             {/* Drawer Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '16px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '20px' }}>🌿</span>
+                <img
+                  src="/logo.svg"
+                  alt="Pohonlink"
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '6px',
+                    display: 'block',
+                  }}
+                />
                 <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent)' }}>Pohonlink</span>
               </div>
               <button

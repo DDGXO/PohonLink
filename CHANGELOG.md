@@ -4,6 +4,18 @@ Semua perubahan dan pembaruan pada proyek **Pohonlink** dicatat di dalam dokumen
 
 ---
 
+## [v0.6.1] - 2026-09-04
+
+### 🛠️ Perbaikan Posisi Geser Avatar (Crop Pan & Full Canvas) dan Standarisasi Logo
+- **Dukungan Posisi Geser Gambar & GIF (Crop Pan vs Full Canvas)**:
+  - Mode Crop Masking: Memetakan koordinat pan X dan Y ke CSS `objectPosition` sehingga titik fokus foto/gambar bergeser secara akurat di dalam bingkai tanpa merusak tata letak elemen.
+  - Mode Full Canvas: Mendukung transformasi translasi dua sumbu (`transform: translate(X%, Y%) scale(...)`) untuk penempatan bebas sticker atau GIF bergerak tanpa terpotong.
+  - Perbaikan disinkronkan sepenuhnya antara layar pratinjau Pengaturan (`settings-client.tsx`) dan halaman profil publik (`profile-public.tsx`).
+- **Standarisasi Logo Vektor Brand (`/logo.svg`)**:
+  - Mengganti seluruh sisa penggunaan emotikon pohon pada bilah samping Desktop Dashboard (`(dashboard)/layout.tsx`), header bilah atas Mobile (`dashboard-mobile-nav.tsx`), drawer menu navigasi seluler, halaman autentikasi (Login, Register, Lupa Password, Reset Password), dan halaman Error 404 (`not-found.tsx`) dengan logo resmi `/logo.svg`.
+
+---
+
 ## [v0.6.0] - 2026-09-04
 
 ### 🌿 Awwwards-Grade Bento Grid Showcase & Fluid Responsive Layout

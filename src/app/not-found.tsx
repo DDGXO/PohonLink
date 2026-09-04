@@ -63,7 +63,7 @@ export default function NotFound() {
             marginBottom: '20px',
           }}
         >
-          <span style={{ fontSize: '14px' }}>🌿</span>
+          <img src="/logo.svg" alt="Pohonlink" style={{ width: '14px', height: '14px', borderRadius: '3px' }} />
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent, #7DF9B6)', letterSpacing: '0.08em' }}>
             ERROR 404
           </span>

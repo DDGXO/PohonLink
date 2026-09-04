@@ -664,7 +664,10 @@ export default function SettingsClient({ email, username, displayName, bio, avat
       borderRadius: isFullCanvas ? r : undefined,
       border: isFullCanvas ? border : undefined,
       boxShadow: isFullCanvas ? boxShadow : undefined,
-      transform: `translate(${avatarOffsetX}%, ${avatarOffsetY}%) scale(${avatarZoom / 100})`,
+      objectPosition: !isFullCanvas ? `${50 + avatarOffsetX}% ${50 + avatarOffsetY}%` : undefined,
+      transform: isFullCanvas
+        ? `translate(${avatarOffsetX}%, ${avatarOffsetY}%) scale(${avatarZoom / 100})`
+        : `scale(${avatarZoom / 100})`,
       transformOrigin: 'center center',
       display: 'block',
       transition: isDragging ? 'none' : 'transform 0.05s ease',

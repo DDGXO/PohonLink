@@ -24,19 +24,18 @@ export default function LoginPage() {
       <div style={{ width: '100%', maxWidth: '400px' }}>
         {/* Logo/Brand */}
         <div style={{ marginBottom: '32px', textAlign: 'center' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            background: 'var(--accent)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-            fontSize: '24px',
-          }}>
-            🌿
-          </div>
+          <img
+            src="/logo.svg"
+            alt="Pohonlink"
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '10px',
+              margin: '0 auto 16px',
+              display: 'block',
+              boxShadow: '0 0 16px rgba(125, 249, 182, 0.25)',
+            }}
+          />
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>Pohonlink</h1>
           <p style={{ fontSize: '14px', color: 'var(--text-dim)' }}>Masuk ke akun kamu</p>
         </div>

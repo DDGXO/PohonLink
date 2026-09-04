@@ -463,7 +463,10 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
               borderRadius: isFullCanvas ? r : undefined,
               border: isFullCanvas ? border : undefined,
               boxShadow: isFullCanvas ? boxShadow : undefined,
-              transform: `translate(${offsetX}%, ${offsetY}%) scale(${zoom / 100})`,
+              objectPosition: !isFullCanvas ? `${50 + offsetX}% ${50 + offsetY}%` : undefined,
+              transform: isFullCanvas
+                ? `translate(${offsetX}%, ${offsetY}%) scale(${zoom / 100})`
+                : `scale(${zoom / 100})`,
               transformOrigin: 'center center',
               display: 'block',
             };
