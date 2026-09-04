@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getAuthenticatedUser } from '@/lib/auth';
 import {
   getAllLinks,
+  getAllProducts,
   getPageviewCount,
   getOsBreakdown,
   getDeviceBreakdown,
@@ -16,20 +17,22 @@ export default async function AnalyticsPage() {
 
   const { user, profile } = auth;
 
-  const [links, totalViews, osEntries, deviceEntries, referrerEntries, rawEvents] = await Promise.all([
+  const [standardLinks, products, totalViews, osEntries, deviceEntries, referrerEntries, rawEvents] = await Promise.all([
     getAllLinks(user.id),
+    getAllProducts(user.id),
     getPageviewCount(user.id),
     getOsBreakdown(user.id),
     getDeviceBreakdown(user.id),
     getReferrerBreakdown(user.id),
-    getAnalyticsEvents(user.id, 500),
+    getAnalyticsEvents(user.id, 5000),
   ]);
 
-  const totalClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
+  const allItems = [...standardLinks, ...products];
+  const totalClicks = allItems.reduce((sum, link) => sum + (link.click_count || 0), 0);
 
   return (
     <AnalyticsClient
-      links={links}
+      links={allItems}
       totalViews={totalViews}
       totalClicks={totalClicks}
       osEntries={osEntries}

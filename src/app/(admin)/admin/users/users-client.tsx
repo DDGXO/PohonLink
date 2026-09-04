@@ -3,17 +3,31 @@
 import { useState, useTransition } from 'react';
 import { adminBlockUser, adminDeleteUser, adminToggleVip, adminCreateUser } from '@/app/actions';
 import type { Profile } from '@/types/database';
+import ConfirmDialog from '@/components/confirm-dialog';
+import Toast from '@/components/toast';
 
 export default function AdminUsersClient({ users: initial }: { users: Profile[] }) {
   const [users, setUsers] = useState<Profile[]>(initial);
   const [showAddModal, setShowAddModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' | 'danger' } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
+  const [blockingUser, setBlockingUser] = useState<Profile | null>(null);
 
-  const handleBlock = (userId: string, currentBlock: boolean) => {
+  const handleBlock = (user: Profile) => {
+    setBlockingUser(user);
+  };
+
+  const handleConfirmBlock = () => {
+    if (!blockingUser) return;
+    const userToBlock = blockingUser;
+    const wasBlocked = userToBlock.is_blocked;
+    setBlockingUser(null);
     startTransition(async () => {
-      await adminBlockUser(userId, !currentBlock);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_blocked: !currentBlock } : u));
+      await adminBlockUser(userToBlock.id, !wasBlocked);
+      setUsers(prev => prev.map(u => u.id === userToBlock.id ? { ...u, is_blocked: !wasBlocked } : u));
+      setToast({ message: wasBlocked ? `Blokir @${userToBlock.username} dibuka!` : `@${userToBlock.username} berhasil diblokir!`, type: 'info' });
     });
   };
 
@@ -22,14 +36,22 @@ export default function AdminUsersClient({ users: initial }: { users: Profile[] 
     startTransition(async () => {
       await adminToggleVip(userId, !isVip);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: isVip ? 'user' : 'vip' } : u));
+      setToast({ message: isVip ? 'Status VIP dicabut' : 'Status VIP berhasil diberikan!', type: 'success' });
     });
   };
 
-  const handleDelete = (userId: string) => {
-    if (!confirm('Hapus user ini permanen?')) return;
+  const handleDelete = (user: Profile) => {
+    setDeletingUser(user);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingUser) return;
+    const userToDelete = deletingUser;
+    setDeletingUser(null);
     startTransition(async () => {
-      await adminDeleteUser(userId);
-      setUsers(prev => prev.filter(u => u.id !== userId));
+      await adminDeleteUser(userToDelete.id);
+      setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+      setToast({ message: `Pengguna @${userToDelete.username} berhasil dihapus!`, type: 'success' });
     });
   };
 
@@ -40,9 +62,11 @@ export default function AdminUsersClient({ users: initial }: { users: Profile[] 
       const res = await adminCreateUser(fd);
       if (res?.error) {
         setError(res.error);
+        setToast({ message: res.error, type: 'error' });
       } else {
         setShowAddModal(false);
         setError(null);
+        setToast({ message: 'Pengguna baru berhasil dibuat!', type: 'success' });
         window.location.reload();
       }
     });
@@ -150,7 +174,7 @@ export default function AdminUsersClient({ users: initial }: { users: Profile[] 
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleBlock(u.id, u.is_blocked)}
+                    onClick={() => handleBlock(u)}
                     disabled={isPending}
                     style={{
                       padding: '6px 12px',
@@ -165,7 +189,7 @@ export default function AdminUsersClient({ users: initial }: { users: Profile[] 
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(u.id)}
+                    onClick={() => handleDelete(u)}
                     disabled={isPending}
                     style={{
                       padding: '6px 12px', background: 'rgba(255,77,77,0.1)',
@@ -181,6 +205,41 @@ export default function AdminUsersClient({ users: initial }: { users: Profile[] 
           </div>
         ))}
       </div>
+
+      {/* Admin Delete User Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(deletingUser)}
+        title={`Hapus Pengguna @${deletingUser?.username}?`}
+        message={`Akun @${deletingUser?.username} (${deletingUser?.display_name || 'Tanpa Nama'}) dan seluruh link miliknya akan dihapus secara permanen dari basis data. Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Ya, Hapus Pengguna"
+        cancelLabel="Batal"
+        isDanger={true}
+        isLoading={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingUser(null)}
+      />
+
+      {/* Admin Block/Unblock User Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(blockingUser)}
+        title={blockingUser?.is_blocked ? `Buka Blokir @${blockingUser?.username}?` : `Blokir Pengguna @${blockingUser?.username}?`}
+        message={blockingUser?.is_blocked
+          ? `Akun @${blockingUser?.username} akan dipulihkan dan dapat diakses kembali oleh publik.`
+          : `Akun @${blockingUser?.username} akan diblokir sehingga halaman publik tidak dapat diakses oleh pengunjung.`}
+        confirmLabel={blockingUser?.is_blocked ? 'Ya, Buka Blokir' : 'Ya, Blokir Akun'}
+        cancelLabel="Batal"
+        isDanger={!blockingUser?.is_blocked}
+        isLoading={isPending}
+        onConfirm={handleConfirmBlock}
+        onCancel={() => setBlockingUser(null)}
+      />
+
+      {/* Floating Toast Feedback */}
+      <Toast
+        message={toast?.message ?? null}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }

@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/database';
+import type { Database, LinkType, EventType } from '@/types/database';
 import {
   isDangerousUrl,
   formatSafeUrl,
@@ -24,7 +25,7 @@ async function getAuthSession() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, is_blocked')
+    .select('id, role, is_blocked, settings')
     .eq('id', user.id)
     .single();
 
@@ -96,7 +97,32 @@ export async function signUp(formData: FormData) {
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  
+  // 1. Terminate Supabase session globally
+  try {
+    await supabase.auth.signOut({ scope: 'global' });
+  } catch {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+  }
+
+  // 2. Audit & thoroughly purge all session/auth cookies
+  try {
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    for (const c of allCookies) {
+      if (
+        c.name.startsWith('sb-') ||
+        c.name.includes('auth-token') ||
+        c.name.includes('supabase') ||
+        c.name.includes('session')
+      ) {
+        cookieStore.delete(c.name);
+      }
+    }
+  } catch {}
+
   revalidatePath('/', 'layout');
   redirect('/login');
 }
@@ -145,19 +171,82 @@ export async function updateProfile(formData: FormData) {
   if (rawSettings && typeof rawSettings === 'object') {
     // Privilege escalation prevention: only admin or vip can enable verified badge
     const canVerify = session.profile.role === 'admin' || session.profile.role === 'vip';
-    const validShapes = ['circle', 'rounded', 'square'];
+    const validShapes = ['circle', 'rounded', 'square', 'wide', 'original', 'custom'];
     const avatarShape = typeof rawSettings.avatar_shape === 'string' && validShapes.includes(rawSettings.avatar_shape)
-      ? rawSettings.avatar_shape as 'circle' | 'rounded' | 'square'
+      ? rawSettings.avatar_shape as 'circle' | 'rounded' | 'square' | 'wide' | 'original' | 'custom'
       : 'circle';
+
+    const validMaskings = ['crop', 'full'];
+    const avatarMasking = typeof rawSettings.avatar_masking === 'string' && validMaskings.includes(rawSettings.avatar_masking)
+      ? rawSettings.avatar_masking as 'crop' | 'full'
+      : 'crop';
+
+    const validFits = ['cover', 'contain', 'fill'];
+    const avatarFit = typeof rawSettings.avatar_fit === 'string' && validFits.includes(rawSettings.avatar_fit)
+      ? rawSettings.avatar_fit as 'cover' | 'contain' | 'fill'
+      : 'cover';
+
+    const validSizes = ['small', 'medium', 'large', 'xlarge'];
+    const avatarSize = typeof rawSettings.avatar_size === 'string' && validSizes.includes(rawSettings.avatar_size)
+      ? rawSettings.avatar_size as 'small' | 'medium' | 'large' | 'xlarge'
+      : 'medium';
+
+    const rawZoom = Number(rawSettings.avatar_zoom);
+    const avatarZoom = !isNaN(rawZoom) && rawZoom >= 50 && rawZoom <= 250 ? rawZoom : 100;
+
+    const validBorderStyles = ['none', 'solid', 'dashed', 'dotted', 'double', 'glow'];
+    const avatarBorderStyle = typeof rawSettings.avatar_border_style === 'string' && validBorderStyles.includes(rawSettings.avatar_border_style)
+      ? rawSettings.avatar_border_style as 'none' | 'solid' | 'dashed' | 'dotted' | 'double' | 'glow'
+      : 'solid';
+
+    const rawBorderWidth = Number(rawSettings.avatar_border_width);
+    const avatarBorderWidth = !isNaN(rawBorderWidth) && rawBorderWidth >= 0 && rawBorderWidth <= 12 ? rawBorderWidth : 2;
+
+    const avatarBorderColor = typeof rawSettings.avatar_border_color === 'string' && /^#([0-9a-fA-F]{3,8})$|^rgba?\([^)]+\)$/.test(rawSettings.avatar_border_color.trim())
+      ? rawSettings.avatar_border_color.trim()
+      : '#4ade80';
+
+    const validShadows = ['none', 'soft', 'hard', 'glow'];
+    const avatarShadow = typeof rawSettings.avatar_shadow === 'string' && validShadows.includes(rawSettings.avatar_shadow)
+      ? rawSettings.avatar_shadow as 'none' | 'soft' | 'hard' | 'glow'
+      : 'soft';
+
+    const avatarShadowColor = typeof rawSettings.avatar_shadow_color === 'string' && /^#([0-9a-fA-F]{3,8})$|^rgba?\([^)]+\)$/.test(rawSettings.avatar_shadow_color.trim())
+      ? rawSettings.avatar_shadow_color.trim()
+      : 'rgba(0,0,0,0.25)';
+
+    const rawCustomRadius = Number(rawSettings.avatar_radius_custom);
+    const avatarRadiusCustom = !isNaN(rawCustomRadius) && rawCustomRadius >= 0 && rawCustomRadius <= 50 ? rawCustomRadius : (avatarShape === 'circle' ? 50 : 16);
+
+    const rawOffsetX = Number(rawSettings.avatar_offset_x);
+    const avatarOffsetX = !isNaN(rawOffsetX) && rawOffsetX >= -100 && rawOffsetX <= 100 ? rawOffsetX : 0;
+
+    const rawOffsetY = Number(rawSettings.avatar_offset_y);
+    const avatarOffsetY = !isNaN(rawOffsetY) && rawOffsetY >= -100 && rawOffsetY <= 100 ? rawOffsetY : 0;
 
     const socialPosition = rawSettings.social_position === 'bottom' ? 'bottom' : 'top';
 
+    const existingSettings = (session.profile.settings as Record<string, unknown> | null) || {};
     updateData.settings = {
+      ...existingSettings,
       open_links_new_tab: Boolean(rawSettings.open_links_new_tab),
       show_share_button: rawSettings.show_share_button !== false,
       show_verified_badge: canVerify ? Boolean(rawSettings.show_verified_badge) : false,
       hide_username: Boolean(rawSettings.hide_username),
       avatar_shape: avatarShape,
+      avatar_masking: avatarMasking,
+      avatar_fit: avatarFit,
+      avatar_zoom: avatarZoom,
+      avatar_size: avatarSize,
+      avatar_border_style: avatarBorderStyle,
+      avatar_border_width: avatarBorderWidth,
+      avatar_border_color: avatarBorderColor,
+      avatar_shadow: avatarShadow,
+      avatar_shadow_color: avatarShadowColor,
+      avatar_radius_custom: avatarRadiusCustom,
+      avatar_offset_x: avatarOffsetX,
+      avatar_offset_y: avatarOffsetY,
+      avatar_video_url: typeof rawSettings.avatar_video_url === 'string' ? rawSettings.avatar_video_url.trim() : (existingSettings.avatar_video_url || ''),
       social_position: socialPosition,
       show_footer: rawSettings.show_footer !== false,
       custom_footer_text: typeof rawSettings.custom_footer_text === 'string' ? rawSettings.custom_footer_text.trim().slice(0, 100) : undefined,
@@ -172,6 +261,8 @@ export async function updateProfile(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath('/dashboard');
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
   return { success: true };
 }
 
@@ -249,10 +340,14 @@ export async function createLink(formData: FormData) {
     dbType = 'text';
     customCssObj.is_html = true;
     finalUrl = htmlContent?.trim() || null;
-  } else if (type === 'spotify' || type === 'youtube' || type === 'apple_music') {
+  } else if (type === 'spotify' || type === 'youtube' || type === 'apple_music' || type === 'soundcloud' || type === 'vimeo' || type === 'twitch') {
     dbType = 'link';
     customCssObj.embed_type = type;
     finalUrl = formatSafeUrl(finalUrl || '');
+  } else if (type === 'lead_form') {
+    dbType = 'text';
+    customCssObj.is_lead_form = true;
+    finalUrl = '';
   } else if (type === 'link' && finalUrl) {
     dbType = 'link';
     finalUrl = formatSafeUrl(finalUrl);
@@ -269,9 +364,14 @@ export async function createLink(formData: FormData) {
     dbType = type;
   }
 
+  const is_featured = formData.get('is_featured') === 'true' || formData.get('is_featured') === 'on';
+  if (is_featured) {
+    customCssObj.is_featured = true;
+  }
+
   const { error } = await session.supabase.from('links').insert({
     user_id: session.user.id,
-    title: title?.trim() || (type === 'html' ? 'Custom HTML' : type),
+    title: title?.trim() || (type === 'html' ? 'Custom HTML' : type === 'lead_form' ? 'Daftar Newsletter' : type),
     url: finalUrl,
     type: dbType,
     custom_css: customCssObj,
@@ -296,6 +396,7 @@ export async function updateLink(id: string, formData: FormData) {
   const is_locked = formData.get('is_locked') === 'true' || formData.get('is_locked') === 'on';
   const lock_type = (formData.get('lock_type') as string) || 'pin';
   const lock_pin = (formData.get('lock_pin') as string)?.trim() || undefined;
+  const is_featured = formData.get('is_featured') === 'true' || formData.get('is_featured') === 'on';
 
   // IDOR fix: ensure link belongs to user before reading/updating
   const { data: existingLink } = await session.supabase
@@ -336,6 +437,7 @@ export async function updateLink(id: string, formData: FormData) {
     is_locked,
     lock_type: is_locked ? lock_type : undefined,
     lock_pin: is_locked ? lock_pin : undefined,
+    is_featured,
   };
 
   const { error } = await session.supabase
@@ -929,6 +1031,387 @@ export async function toggleShopSetting(enabled: boolean, shopTitle?: string, sh
   if (error) return { error: error.message };
   revalidatePath('/shop');
   revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateSocialLinks(socialLinks: Record<string, string>) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const sanitized = sanitizeSocialLinks(socialLinks);
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const newSettings = {
+    ...currentSettings,
+    social_links: sanitized,
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: newSettings } as unknown as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateCustomSEO(seoData: {
+  title?: string;
+  description?: string;
+  og_image_url?: string;
+  meta_keywords?: string;
+}) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const newSettings = {
+    ...currentSettings,
+    seo_meta: {
+      title: seoData.title?.trim() || '',
+      description: seoData.description?.trim() || '',
+      og_image_url: seoData.og_image_url?.trim() || '',
+      meta_keywords: seoData.meta_keywords?.trim() || '',
+    },
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: newSettings } as unknown as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateAutoRedirect(config: { enabled: boolean; url: string }) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const finalUrl = config.url ? formatSafeUrl(config.url) : '';
+  if (config.enabled && isDangerousUrl(finalUrl)) {
+    return { error: 'URL pengalihan tidak aman' };
+  }
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const newSettings = {
+    ...currentSettings,
+    auto_redirect: {
+      enabled: config.enabled,
+      url: finalUrl,
+    },
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: newSettings } as unknown as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateVCardConfig(vcard: {
+  enabled: boolean;
+  full_name?: string;
+  phone?: string;
+  email?: string;
+  company?: string;
+  job_title?: string;
+  note?: string;
+}) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const newSettings = {
+    ...currentSettings,
+    vcard: {
+      enabled: vcard.enabled,
+      full_name: vcard.full_name?.trim() || '',
+      phone: vcard.phone?.trim() || '',
+      email: vcard.email?.trim() || '',
+      company: vcard.company?.trim() || '',
+      job_title: vcard.job_title?.trim() || '',
+      note: vcard.note?.trim() || '',
+    },
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: newSettings } as unknown as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function createHeaderLink(title: string) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const cleanTitle = title.trim();
+  if (!cleanTitle) return { error: 'Judul header kategori tidak boleh kosong' };
+
+  const { data: lastLink } = await session.supabase
+    .from('links')
+    .select('sort_order')
+    .eq('user_id', session.user.id)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .single();
+
+  const sort_order = (lastLink?.sort_order ?? -1) + 1;
+
+  const { error } = await session.supabase.from('links').insert({
+    user_id: session.user.id,
+    title: cleanTitle,
+    url: '',
+    type: 'heading' as LinkType,
+    sort_order,
+    is_active: true,
+    is_pinned: false,
+    custom_css: { is_heading: true },
+  } as unknown as Database['public']['Tables']['links']['Insert']);
+
+  if (error) return { error: error.message };
+  revalidatePath('/links');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function submitLeadCapture(profileId: string, name: string, email: string, note?: string) {
+  const supabase = await createClient();
+  const cleanName = name.trim();
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    return { error: 'Alamat email tidak valid' };
+  }
+
+  // Record as event in analytics_events for lead capture storage
+  await supabase.from('analytics_events').insert({
+    profile_id: profileId,
+    event: 'click' as EventType,
+    referer: `lead:${cleanName}:${cleanEmail}:${note ? note.slice(0, 100) : ''}`,
+    os: 'lead_capture',
+  } as unknown as Database['public']['Tables']['analytics_events']['Insert']);
+
+  return { success: true };
+}
+
+export async function updateSmartSorting(enabled: boolean) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const updatedSettings = {
+    ...currentSettings,
+    smart_sorting_enabled: enabled,
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: updatedSettings } as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/links');
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateMarketingPixels(pixels: {
+  meta_pixel_id?: string;
+  ga4_id?: string;
+  gtm_id?: string;
+  tiktok_pixel_id?: string;
+  pinterest_tag_id?: string;
+}) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const updatedSettings = {
+    ...currentSettings,
+    marketing_pixels: {
+      meta_pixel_id: pixels.meta_pixel_id?.trim() || undefined,
+      ga4_id: pixels.ga4_id?.trim() || undefined,
+      gtm_id: pixels.gtm_id?.trim() || undefined,
+      tiktok_pixel_id: pixels.tiktok_pixel_id?.trim() || undefined,
+      pinterest_tag_id: pixels.pinterest_tag_id?.trim() || undefined,
+    },
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: updatedSettings } as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/settings');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function updateAutoDmConfig(autoDm: {
+  enabled: boolean;
+  keyword: string;
+  message: string;
+}) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: profile } = await session.supabase
+    .from('profiles')
+    .select('settings')
+    .eq('id', session.user.id)
+    .single();
+
+  const currentSettings = (profile?.settings as Record<string, unknown> | null) || {};
+  const updatedSettings = {
+    ...currentSettings,
+    auto_dm: {
+      enabled: autoDm.enabled,
+      keyword: autoDm.keyword?.trim() || '',
+      message: autoDm.message?.trim() || '',
+    },
+  };
+
+  const { error } = await session.supabase
+    .from('profiles')
+    .update({ settings: updatedSettings } as Database['public']['Tables']['profiles']['Update'])
+    .eq('id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/settings');
+  revalidatePath('/links');
+  return { success: true };
+}
+
+export async function archiveLink(id: string, archive: boolean) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+
+  const { data: existingLink } = await session.supabase
+    .from('links')
+    .select('custom_css')
+    .eq('id', id)
+    .eq('user_id', session.user.id)
+    .single();
+
+  if (!existingLink) return { error: 'Link tidak ditemukan' };
+
+  const existingMeta = (existingLink.custom_css as Record<string, unknown> | null) || {};
+  const updatedCustomCss = {
+    ...existingMeta,
+    is_archived: archive,
+  };
+
+  const { error } = await session.supabase
+    .from('links')
+    .update({ custom_css: updatedCustomCss } as Database['public']['Tables']['links']['Update'])
+    .eq('id', id)
+    .eq('user_id', session.user.id);
+
+  if (error) return { error: error.message };
+  revalidatePath('/links');
+  revalidatePath('/', 'layout');
+  return { success: true };
+}
+
+export async function bulkUpdateLinks(
+  ids: string[],
+  action: 'activate' | 'deactivate' | 'archive' | 'unarchive' | 'delete'
+) {
+  const session = await getAuthSession();
+  if (session.error || !session.user) return { error: session.error };
+  if (!ids || ids.length === 0) return { error: 'Pilih minimal satu link' };
+
+  if (action === 'delete') {
+    const { error } = await session.supabase
+      .from('links')
+      .delete()
+      .in('id', ids)
+      .eq('user_id', session.user.id);
+
+    if (error) return { error: error.message };
+  } else if (action === 'activate' || action === 'deactivate') {
+    const { error } = await session.supabase
+      .from('links')
+      .update({ is_active: action === 'activate' } as Database['public']['Tables']['links']['Update'])
+      .in('id', ids)
+      .eq('user_id', session.user.id);
+
+    if (error) return { error: error.message };
+  } else if (action === 'archive' || action === 'unarchive') {
+    const { data: links } = await session.supabase
+      .from('links')
+      .select('id, custom_css')
+      .in('id', ids)
+      .eq('user_id', session.user.id);
+
+    if (links) {
+      for (const link of links) {
+        const meta = (link.custom_css as Record<string, unknown> | null) || {};
+        await session.supabase
+          .from('links')
+          .update({
+            custom_css: { ...meta, is_archived: action === 'archive' },
+          } as Database['public']['Tables']['links']['Update'])
+          .eq('id', link.id)
+          .eq('user_id', session.user.id);
+      }
+    }
+  }
+
+  revalidatePath('/links');
   revalidatePath('/', 'layout');
   return { success: true };
 }

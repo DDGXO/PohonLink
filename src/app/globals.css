@@ -124,12 +124,42 @@ select {
   max-width: 100%;
 }
 
-/* Mobile Floating Bottom Dock */
-.dashboard-bottom-dock {
+/* Mobile Floating Bottom Dock & Burger Button */
+.mobile-burger-btn {
   display: flex;
 }
 
-/* Desktop Viewport (>= 768px) */
+.dashboard-bottom-dock {
+  display: none;
+}
+
+/* Ultra Small Mobile (< 480px): Burger only, No Dock */
+@media (max-width: 479px) {
+  .mobile-burger-btn {
+    display: flex !important;
+  }
+  .dashboard-bottom-dock {
+    display: none !important;
+  }
+  .dashboard-main {
+    padding-bottom: 32px !important;
+  }
+}
+
+/* Medium Mobile & Phablet (480px - 767px): Full Dock, No Burger */
+@media (min-width: 480px) and (max-width: 767px) {
+  .mobile-burger-btn {
+    display: none !important;
+  }
+  .dashboard-bottom-dock {
+    display: flex !important;
+  }
+  .dashboard-main {
+    padding-bottom: 110px !important;
+  }
+}
+
+/* Desktop Viewport (>= 768px): Left Sidebar Only */
 @media (min-width: 768px) {
   .dashboard-topbar {
     display: none !important;
@@ -271,3 +301,245 @@ select {
   text-align: center;
   margin-top: 40px;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Responsive Settings Layout (Desktop 2-Column Grid) */
+.settings-desktop-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .settings-desktop-grid {
+    grid-template-columns: 1fr 380px !important;
+    gap: 28px !important;
+  }
+}
+
+.settings-equal-2col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .settings-equal-2col {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 24px !important;
+  }
+}
+
+.settings-sticky-pane {
+  position: static;
+}
+
+@media (min-width: 1024px) {
+  .settings-sticky-pane {
+    position: sticky !important;
+    top: 24px !important;
+  }
+  .mobile-avatar-floating-badge {
+    display: none !important;
+  }
+}
+
+/* Landing Page Animations & Responsive Helpers */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+.landing-mockup-float {
+  animation: floatSlow 5s ease-in-out infinite;
+}
+
+.landing-glow-orb {
+  animation: pulseGlow 7s ease-in-out infinite;
+}
+
+.landing-dot-pulse {
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+.landing-hero-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+@media (min-width: 900px) {
+  .landing-hero-grid {
+    display: grid !important;
+    grid-template-columns: 1.15fr 0.85fr !important;
+    gap: 48px !important;
+    align-items: center !important;
+  }
+}
+
+.landing-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing-card-hover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(125, 249, 182, 0.35) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(125, 249, 182, 0.08);
+}
+
+/* Mobile Menu Drawer Animation */
+@keyframes drawerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anim-drawer-slide {
+  animation: drawerSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Animated Hamburger lines */
+.burger-icon-line {
+  width: 18px;
+  height: 2px;
+  background-color: #f0ece4;
+  border-radius: 2px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: block;
+}
+
+/* Bento Grid System */
+.bento-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .bento-grid {
+    grid-template-columns: repeat(12, 1fr);
+    gap: 20px;
+  }
+  .bento-col-8 {
+    grid-column: span 8;
+  }
+  .bento-col-4 {
+    grid-column: span 4;
+  }
+  .bento-col-6 {
+    grid-column: span 6;
+  }
+  .bento-col-12 {
+    grid-column: span 12;
+  }
+}
+
+/* Micro-animations for Feature Cards */
+@keyframes barBounce1 {
+  0%, 100% { height: 6px; }
+  50% { height: 22px; }
+}
+@keyframes barBounce2 {
+  0%, 100% { height: 18px; }
+  50% { height: 8px; }
+}
+@keyframes barBounce3 {
+  0%, 100% { height: 10px; }
+  50% { height: 26px; }
+}
+@keyframes barBounce4 {
+  0%, 100% { height: 24px; }
+  50% { height: 12px; }
+}
+
+.anim-bar-1 { animation: barBounce1 1.1s ease-in-out infinite; }
+.anim-bar-2 { animation: barBounce2 0.85s ease-in-out infinite; }
+.anim-bar-3 { animation: barBounce3 1.3s ease-in-out infinite; }
+.anim-bar-4 { animation: barBounce4 0.95s ease-in-out infinite; }
+
+@keyframes radarPing {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.anim-spin-slow {
+  animation: spinSlow 6s linear infinite;
+}
+
+@keyframes gridPerspective {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 40px; }
+}
+
+.anim-grid-flow {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(125, 249, 182, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(125, 249, 182, 0.08) 1px, transparent 1px);
+  animation: gridPerspective 3s linear infinite;
+}
+
+.landing-fluid-nav {
+  width: 100%;
+  padding: 14px clamp(16px, 4vw, 48px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.landing-fluid-section {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 64px) clamp(16px, 4vw, 48px);
+  box-sizing: border-box;
+}
+
+

@@ -1,23 +1,171 @@
 {
+  "id": "/#pwa",
   "name": "Pohonlink Biolink Platform",
   "short_name": "Pohonlink",
-  "description": "Your single link for everything. A modern biolink platform built for speed.",
-  "start_url": "/",
+  "description": "Platform biolink dan toko digital modern serba satu tautan untuk kreator, bisnis, dan profesional di Indonesia.",
+  "start_url": "/dashboard?utm_source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "orientation": "any",
   "background_color": "#050505",
-  "theme_color": "#7DF9B6",
+  "theme_color": "#4ade80",
+  "categories": [
+    "productivity",
+    "social",
+    "utilities",
+    "business"
+  ],
+  "lang": "id",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/logo.png",
-      "sizes": "192x192",
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/logo.png",
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Pohonlink Dashboard dan Live Preview Desktop"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Tampilan Profil Biolink Pohonlink Mobile"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tambah Link Baru",
+      "short_name": "Tambah Link",
+      "description": "Buka manajemen tautan untuk menambah link atau widget baru",
+      "url": "/links?action=new",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Buka Dashboard",
+      "short_name": "Dashboard",
+      "description": "Lihat ringkasan views, klik, dan performa biolink",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Analitik Statistik",
+      "short_name": "Analitik",
+      "description": "Pantau grafik statistik pengunjung dan CTR per link",
+      "url": "/analytics",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Kustomisasi Tampilan",
+      "short_name": "Tampilan",
+      "description": "Ubah tema, animasi canvas, dan background",
+      "url": "/appearance",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/links",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "launch_handler": {
+    "client_mode": "auto"
+  },
+  "edge_side_panel": {
+    "preferred_width": 420
+  },
+  "handle_links": "preferred"
 }

@@ -4,6 +4,8 @@ import { useState, useTransition, useRef } from 'react';
 import { updateTheme, uploadBackground, removeBackground } from '@/app/actions';
 import type { ThemeConfig } from '@/types/database';
 import ImageCropperModal from '@/components/image-cropper-modal';
+import ConfirmDialog from '@/components/confirm-dialog';
+import Toast from '@/components/toast';
 
 const VIDEO_PRESETS = [
   { name: 'Nebula Space', label: '🌌 Nebula', url: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-1610-large.mp4' },
@@ -162,11 +164,12 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
   const [bgUrl, setBgUrl] = useState<string | null>(initialBgUrl);
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
-  const [bgMsg, setBgMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' | 'danger' } | null>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [cropBgSrc, setCropBgSrc] = useState<string | null>(null);
+  const [showRemoveBgConfirm, setShowRemoveBgConfirm] = useState(false);
 
   const refreshPreview = () => {
     if (iframeRef.current) iframeRef.current.src = iframeRef.current.src;
@@ -174,13 +177,17 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
 
   const applyPreset = (preset: typeof PRESETS[0]) => {
     setTheme(prev => ({ ...prev, ...preset.config, preset: preset.name }));
+    setToast({ message: `Preset tema "${preset.label}" diterapkan!`, type: 'info' });
   };
 
   const handleSave = () => {
     startTransition(async () => {
       const result = await updateTheme(theme);
-      if (!result?.error) {
+      if (result?.error) {
+        setToast({ message: result.error, type: 'error' });
+      } else {
         setSaved(true);
+        setToast({ message: 'Tampilan profil berhasil disimpan!', type: 'success' });
         refreshPreview();
         setTimeout(() => setSaved(false), 2000);
       }
@@ -192,7 +199,7 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
     if (!file) return;
 
     if (file.size > 8 * 1024 * 1024) {
-      setBgMsg({ type: 'error', text: 'Ukuran file maksimal 8MB' });
+      setToast({ message: 'Ukuran file maksimal 8MB', type: 'error' });
       return;
     }
 
@@ -211,24 +218,30 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
       fd.append('background', blob, 'background.webp');
       const res = await uploadBackground(fd);
       if (res?.error) {
-        setBgMsg({ type: 'error', text: res.error });
+        setToast({ message: res.error, type: 'error' });
       } else if (res?.bg_url) {
         setBgUrl(res.bg_url);
         setTheme(prev => ({ ...prev, bg_type: 'image' }));
-        setBgMsg({ type: 'success', text: 'Gambar latar berhasil dipotong & diunggah!' });
+        setToast({ message: 'Gambar latar berhasil diunggah!', type: 'success' });
         refreshPreview();
       }
     });
   };
 
   const handleRemoveBg = () => {
-    if (!confirm('Hapus gambar latar kustom?')) return;
+    setShowRemoveBgConfirm(true);
+  };
+
+  const handleConfirmRemoveBg = () => {
+    setShowRemoveBgConfirm(false);
     startTransition(async () => {
       const res = await removeBackground();
-      if (!res?.error) {
+      if (res?.error) {
+        setToast({ message: res.error, type: 'error' });
+      } else {
         setBgUrl(null);
         setTheme(prev => ({ ...prev, bg_type: 'color' }));
-        setBgMsg({ type: 'success', text: 'Gambar latar dihapus' });
+        setToast({ message: 'Gambar latar berhasil dihapus!', type: 'success' });
         refreshPreview();
       }
     });
@@ -294,15 +307,6 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
               </button>
             ))}
           </div>
-
-          {bgMsg && (
-            <div style={{
-              padding: '8px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '12px',
-              background: bgMsg.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(255,77,77,0.1)',
-              border: `1px solid ${bgMsg.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(255,77,77,0.3)'}`,
-              color: bgMsg.type === 'success' ? 'var(--success)' : 'var(--danger)',
-            }}>{bgMsg.text}</div>
-          )}
 
           {/* Mode: Gradient */}
           {theme.bg_type === 'gradient' && (
@@ -946,6 +950,26 @@ export default function AppearanceClient({ theme: initialTheme, bgUrl: initialBg
           onCancel={() => setCropBgSrc(null)}
         />
       )}
+
+      {/* Remove Background Image Confirmation */}
+      <ConfirmDialog
+        isOpen={showRemoveBgConfirm}
+        title="Hapus Gambar Latar?"
+        message="Gambar latar kustom kamu akan dihapus dan tampilan latar akan dikembalikan ke warna solid. Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Gambar"
+        cancelLabel="Batal"
+        isDanger={true}
+        isLoading={isPending}
+        onConfirm={handleConfirmRemoveBg}
+        onCancel={() => setShowRemoveBgConfirm(false)}
+      />
+
+      {/* Floating Toast Feedback */}
+      <Toast
+        message={toast?.message ?? null}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }

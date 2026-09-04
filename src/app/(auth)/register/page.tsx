@@ -92,9 +92,14 @@ export default function RegisterPage() {
         <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-dim)', marginTop: '20px' }}>
           Sudah punya akun?{' '}<Link href="/login" style={{ color: 'var(--accent)', fontWeight: 500 }}>Masuk</Link>
         </p>
-        <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px', opacity: 0.7 }}>
-          Open source di <a href="https://github.com/DDGXO/PohonLink" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>DDGXO/PohonLink</a> untuk self-host.
-        </p>
+
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-dim)', marginTop: '24px' }}>
+          <Link href="/" style={{ color: 'inherit', textDecoration: 'none' }}>Beranda</Link>
+          <span>•</span>
+          <Link href="/about" style={{ color: 'inherit', textDecoration: 'none' }}>Tentang</Link>
+          <span>•</span>
+          <Link href="/thank-you" style={{ color: 'inherit', textDecoration: 'none' }}>Terima Kasih</Link>
+        </div>
       </div>
     </main>
   );

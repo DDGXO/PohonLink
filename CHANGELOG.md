@@ -4,6 +4,40 @@ Semua perubahan dan pembaruan pada proyek **Pohonlink** dicatat di dalam dokumen
 
 ---
 
+## [v0.6.0] - 2026-09-04
+
+### 🌿 Awwwards-Grade Bento Grid Showcase & Fluid Responsive Layout
+- **Showcase Interaktif Bento Grid (`/`)**:
+  - Mengganti tab slider horizontal tersembunyi dengan layout Bento Grid responsif penuh (12-kolom pada desktop, tumpuk vertikal alami pada mobile) sehingga seluruh fitur langsung terlihat tanpa perlu digeser.
+  - **Katalog E-Commerce & WhatsApp Engine**: Simulasi live seleksi produk digital/fisik dengan generator chat order WhatsApp otomatis dan tombol uji kirim interaktif.
+  - **Live Audio & Media HiFi**: Pemutar musik bawaan dengan animasi vinyl berputar, bar equalizer audio dinamis bergelombang, dan toggle interaktif Play/Pause lagu.
+  - **60FPS Canvas Visuals**: Switcher preset tema visual (Matrix, Synthwave, Starfield, Neon) dengan pratinjau rendering kanvas bergerak secara real-time.
+  - **PIN & Age Security Gate**: Keypad numerik 4-digit interaktif untuk menguji pembukaan tautan rahasia ber-PIN (kode tes: `1234`).
+  - **Deep Telemetry**: Visualisasi bar chart persentase distribusi pengunjung (Instagram, TikTok, WhatsApp, Direct) serta tombol simulasi ekspor file CSV dan JSON.
+
+### 📱 Navigasi Fluid & Pengalaman Seluler (Mobile-First)
+- **Fluid Edge-to-Edge Navigation**: Bilah navigasi merentang dinamis mengikuti batas layar dengan skala padding adaptif `clamp(16px, 4vw, 48px)`.
+- **Menu Burger Animasi Modern**:
+  - Tombol hamburger 3 garis dengan transisi morphing mulus menjadi ikon silang (X) saat dibuka.
+  - Drawer menu navigasi meluncur turun (slide down) dengan efek backdrop blur 20px.
+- **Integrasi Logo Vektor Resmi**:
+  - Mengganti ikon pohon generik dengan aset logo vektor resmi platform (`/logo.svg`) pada bilah navigasi dan footer.
+  - Membersihkan emotikon berlebihan pada landing page dan menggantinya dengan ikon SVG monokrom presisi dari `lucide-react`.
+
+### ⚙️ Restrukturisasi Hierarki Halaman Pengaturan (`/settings`)
+- **Penataan Prioritas Identitas Akun**:
+  - Kartu **Username Akun** dipindahkan ke posisi paling atas dengan pratinjau URL publik langsung (`pohonlink.id/@username`), handle `@`, dan tombol salin cepat.
+  - Kartu **Info Profil** ditempatkan di posisi kedua mencakup nama tampilan, email terdaftar, dan bio profil dengan AI Bio Generator.
+  - Kartu **Foto Profil & Avatar Bergerak** ditempatkan pada posisi ketiga lengkap dengan kontrol masking (Full Canvas vs Crop), tombol arah D-Pad, dan mini viewport drag-to-pan interaktif.
+
+### 🚀 PWA, API Health Check & Rute Sistem Terpadu
+- **PWA Ready**: Dukungan manifest PWA lengkap (`/manifest.json`), service worker (`/sw.js`), ikon maskable multi-resolusi, dan halaman offline fallback (`/offline`).
+- **Health Check Endpoint (`/api/health`)**: API monitoring status layanan publik (status database, memory usage, latency, uptime, dan environment) tanpa mengekspos konfigurasi internal model.
+- **vCard Contact Export (`/api/vcard/[username]`)**: Endpoint untuk mengunduh kontak profil langsung ke format `.vcf` buku telepon seluler.
+- **Dynamic SEO Handlers**: Integrasi `src/app/sitemap.ts` dan `src/app/robots.ts` untuk pengindeksan mesin pencari secara dinamis.
+
+---
+
 ## [v0.5.0] - 2026-09-03
 
 ### 🌿 Landing Page Interaktif & Pengamanan Sesi Auth

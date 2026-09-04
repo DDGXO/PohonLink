@@ -16,7 +16,12 @@ export default async function LinksPage() {
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>Links</h1>
         <p style={{ fontSize: '14px', color: 'var(--text-dim)', marginTop: '4px' }}>{links.length} blok terdaftar</p>
       </div>
-      <LinksClient initialLinks={links} userId={user.id} username={profile?.username || ''} />
+      <LinksClient
+        initialLinks={links}
+        userId={user.id}
+        username={profile?.username || ''}
+        smartSortingEnabled={Boolean(profile?.settings?.smart_sorting_enabled)}
+      />
     </div>
   );
 }

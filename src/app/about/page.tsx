@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'About | Pohonlink',
-  description: 'Mengenal Pohonlink: platform biolink modern, cepat, dan open source oleh DGXO.',
+  title: 'Tentang Pohonlink | Platform Biolink & Toko Online',
+  description: 'Pusat integrasi portofolio, media sosial, dan transaksi penjualan produk digital dalam satu tautan terpadu.',
 };
 
 export default function AboutPage() {
@@ -10,127 +10,273 @@ export default function AboutPage() {
     <main
       style={{
         minHeight: '100vh',
-        background: 'var(--bg, #050505)',
-        color: 'var(--text, #f0ece4)',
+        background: '#050505',
+        color: '#f0ece4',
+        padding: '56px 20px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: '48px 20px',
       }}
     >
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '560px',
-          background: 'var(--surface, #161616)',
-          border: '1px solid var(--border, rgba(255, 255, 255, 0.08))',
-          borderRadius: '16px',
-          padding: '36px 32px',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
-        }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div
+      <div style={{ width: '100%', maxWidth: '840px' }}>
+        {/* Navigation Breadcrumb / Top Link */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+          <Link
+            href="/"
             style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '14px',
-              background: 'var(--accent, #7DF9B6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-              fontSize: '28px',
-            }}
-          >
-            🌿
-          </div>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, marginBottom: '6px' }}>
-            Tentang Pohonlink
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--accent, #7DF9B6)', fontFamily: 'monospace', fontWeight: 600 }}>
-            Pohonlink: Your Single Link for Everything.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '14px', lineHeight: 1.7, color: 'var(--text-muted, rgba(240, 236, 228, 0.8))' }}>
-          <p>
-            <strong>Pohonlink</strong> adalah platform biolink modern berkinerja tinggi yang dibangun dari nol menggunakan arsitektur Next.js 16 Server Components dan Supabase. Didesain dengan filosofi <em>Dark-Brutalist Minimalism</em> untuk kecepatan maksimum (TTFB &lt; 50ms) dan kemudahan kustomisasi tanpa batas.
-          </p>
-
-          <div
-            style={{
-              background: 'var(--bg, #050505)',
-              border: '1px solid var(--border, rgba(255, 255, 255, 0.08))',
-              borderRadius: '10px',
-              padding: '16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-              <span style={{ color: 'var(--text-dim, rgba(240, 236, 228, 0.5))' }}>Engine & Arsitektur</span>
-              <strong style={{ color: 'var(--accent, #7DF9B6)' }}>DGXO</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-              <span style={{ color: 'var(--text-dim, rgba(240, 236, 228, 0.5))' }}>Lisensi</span>
-              <span>Open Source (MIT)</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-              <span style={{ color: 'var(--text-dim, rgba(240, 236, 228, 0.5))' }}>Repository Resmi</span>
-              <a
-                href="https://github.com/DDGXO/pohonlink"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'var(--accent, #7DF9B6)', fontWeight: 600, textDecoration: 'none' }}
-              >
-                DDGXO/pohonlink ↗
-              </a>
-            </div>
-          </div>
-
-          <p style={{ fontSize: '13px', fontStyle: 'italic', color: 'rgba(240, 236, 228, 0.45)', textAlign: 'center', margin: '8px 0' }}>
-            &ldquo;Code without limits, think beyond the universe.&rdquo;
-          </p>
-        </div>
-
-        <div style={{ marginTop: '28px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <a
-            href="https://github.com/DDGXO/pohonlink"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              padding: '10px 20px',
-              background: 'var(--accent, #7DF9B6)',
-              color: '#000000',
-              borderRadius: '8px',
               fontSize: '13px',
-              fontWeight: 700,
+              color: 'rgba(240, 236, 228, 0.6)',
               textDecoration: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
             }}
           >
-            ⭐ GitHub Repository
-          </a>
-          <Link
-            href="/dashboard"
+            ← Kembali ke Beranda
+          </Link>
+          <div style={{ display: 'flex', gap: '16px', fontSize: '13px' }}>
+            <Link href="/dashboard" style={{ color: '#4ade80', textDecoration: 'none', fontWeight: 600 }}>
+              Dashboard ↗
+            </Link>
+          </div>
+        </div>
+
+        {/* Hero Section */}
+        <div style={{ marginBottom: '36px' }}>
+          <span
             style={{
-              padding: '10px 18px',
-              background: 'transparent',
-              border: '1px solid var(--border, rgba(255, 255, 255, 0.15))',
-              color: 'var(--text, #f0ece4)',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 500,
-              textDecoration: 'none',
+              display: 'inline-block',
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: '#4ade80',
+              marginBottom: '12px',
             }}
           >
-            Dashboard
-          </Link>
+            Platform Overview
+          </span>
+          <h1 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 12px', color: '#ffffff' }}>
+            Tentang Pohonlink
+          </h1>
+          <p style={{ fontSize: '15px', color: 'rgba(240, 236, 228, 0.75)', lineHeight: 1.6, margin: 0, maxWidth: '640px' }}>
+            Pohonlink adalah platform tautan bio dan etalase mikro terpadu yang dirancang untuk menyatukan seluruh portofolio digital, konten multimedia, dan transaksi penjualan dalam satu URL yang ringkas dan berkinerja tinggi.
+          </p>
+        </div>
+
+        {/* Bento Grid Features */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '16px',
+            marginBottom: '40px',
+          }}
+        >
+          {/* Card 1: Link Hub */}
+          <div
+            style={{
+              background: '#121212',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>
+                Sentralisasi Tautan
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', lineHeight: 1.5, margin: 0 }}>
+                Kelola tautan portofolio, artikel, formulir kontak, dan media sosial dengan kontrol drag-and-drop, pin link teratas, serta tautan terjadwal.
+              </p>
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>
+              Kategori: Manajemen Konten
+            </div>
+          </div>
+
+          {/* Card 2: Micro Store */}
+          <div
+            style={{
+              background: '#121212',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>
+                Etalase & Katalog Produk
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', lineHeight: 1.5, margin: 0 }}>
+                Pajang produk digital maupun fisik dengan tata letak grid/list, label diskon, dan tombol checkout langsung ke WhatsApp atau marketplace.
+              </p>
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>
+              Kategori: Social Commerce
+            </div>
+          </div>
+
+          {/* Card 3: Deep Analytics */}
+          <div
+            style={{
+              background: '#121212',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>
+                Analitik & Pelacakan
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', lineHeight: 1.5, margin: 0 }}>
+                Pantau tren kunjungan harian, rasio klik tayang (CTR) per link, pengunjung unik, serta integrasi Meta Pixel, GA4, dan Google Tag Manager.
+              </p>
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>
+              Kategori: Data & Wawasan
+            </div>
+          </div>
+
+          {/* Card 4: Personalization */}
+          <div
+            style={{
+              background: '#121212',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>
+                Personalisasi Visual
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', lineHeight: 1.5, margin: 0 }}>
+                Kustomisasi warna, gaya tombol (solid, outline, glass), avatar animasi GIF/MP4, latar belakang canvas dinamis, dan custom CSS.
+              </p>
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>
+              Kategori: Desain & Tampilan
+            </div>
+          </div>
+
+          {/* Card 5: PWA & Offline Support */}
+          <div
+            style={{
+              background: '#121212',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>
+                Progressive Web App (PWA)
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', lineHeight: 1.5, margin: 0 }}>
+                Dukungan instalasi aplikasi langsung ke layar utama ponsel atau desktop dengan service worker caching dan fallback halaman offline.
+              </p>
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>
+              Kategori: Performa & Offline
+            </div>
+          </div>
+
+          {/* Card 6: Infrastructure */}
+          <div
+            style={{
+              background: '#121212',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '12px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>
+                Arsitektur Modern
+              </h2>
+              <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', lineHeight: 1.5, margin: 0 }}>
+                Dibangun menggunakan Next.js App Router, Server Components, dan basis data PostgreSQL Supabase untuk respon server cepat dan aman.
+              </p>
+            </div>
+            <div style={{ marginTop: '16px', fontSize: '11px', color: '#4ade80', fontWeight: 600 }}>
+              Kategori: Infrastruktur
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Call to Action */}
+        <div
+          style={{
+            background: '#121212',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '14px',
+            padding: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}
+        >
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: '0 0 4px' }}>
+              Mulai Kelola Biolink Anda
+            </h3>
+            <p style={{ fontSize: '13px', color: 'rgba(240, 236, 228, 0.65)', margin: 0 }}>
+              Buat akun gratis dan atur halaman profil publik Anda sekarang.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Link
+              href="/register"
+              style={{
+                padding: '10px 20px',
+                background: '#4ade80',
+                color: '#000000',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Daftar Akun
+            </Link>
+            <Link
+              href="/login"
+              style={{
+                padding: '10px 18px',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#f0ece4',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 500,
+                textDecoration: 'none',
+              }}
+            >
+              Masuk
+            </Link>
+          </div>
         </div>
       </div>
     </main>

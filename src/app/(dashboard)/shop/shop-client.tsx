@@ -3,6 +3,8 @@
 import { useState, useTransition } from 'react';
 import type { Profile, Link as ProductLink } from '@/types/database';
 import { createProduct, updateProduct, deleteLink, toggleLinkActive, toggleLinkPinned, toggleShopSetting } from '@/app/actions';
+import ConfirmDialog from '@/components/confirm-dialog';
+import Toast from '@/components/toast';
 
 interface Props {
   initialProducts: ProductLink[];
@@ -33,8 +35,9 @@ export default function ShopClient({ initialProducts, profile }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductLink | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' | 'danger' } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
   const [shopEnabled, setShopEnabled] = useState(profile?.settings?.enable_shop ?? true);
   const [shopTitle, setShopTitle] = useState(profile?.settings?.shop_title || 'Toko');
@@ -63,8 +66,7 @@ export default function ShopClient({ initialProducts, profile }: Props) {
     if (layoutParam) setShopLayout(layoutParam);
     startTransition(async () => {
       await toggleShopSetting(enabled, shopTitle, targetLayout);
-      setSuccess('Pengaturan toko diperbarui!');
-      setTimeout(() => setSuccess(null), 2500);
+      setToast({ message: 'Pengaturan toko diperbarui!', type: 'success' });
     });
   };
 
@@ -134,18 +136,27 @@ export default function ShopClient({ initialProducts, profile }: Props) {
 
       if (res?.error) {
         setError(res.error);
+        setToast({ message: res.error, type: 'error' });
       } else {
         setShowAddModal(false);
+        setToast({ message: editingProduct ? 'Produk berhasil diperbarui!' : 'Produk baru berhasil ditambahkan!', type: 'success' });
         refreshPage();
       }
     });
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm('Hapus produk ini dari toko?')) return;
+    setDeletingProductId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingProductId) return;
+    const idToDelete = deletingProductId;
+    setDeletingProductId(null);
     startTransition(async () => {
-      await deleteLink(id);
-      setProducts(prev => prev.filter(p => p.id !== id));
+      await deleteLink(idToDelete);
+      setProducts(prev => prev.filter(p => p.id !== idToDelete));
+      setToast({ message: 'Produk berhasil dihapus dari toko!', type: 'success' });
     });
   };
 
@@ -153,6 +164,7 @@ export default function ShopClient({ initialProducts, profile }: Props) {
     startTransition(async () => {
       await toggleLinkActive(id, current);
       setProducts(prev => prev.map(p => p.id === id ? { ...p, is_active: !current } : p));
+      setToast({ message: current ? 'Produk dinonaktifkan' : 'Produk diaktifkan di toko', type: 'info' });
     });
   };
 
@@ -160,6 +172,7 @@ export default function ShopClient({ initialProducts, profile }: Props) {
     startTransition(async () => {
       await toggleLinkPinned(id, current);
       setProducts(prev => prev.map(p => p.id === id ? { ...p, is_pinned: !current } : p));
+      setToast({ message: current ? 'Pin produk dilepas' : 'Produk dipin sebagai unggulan', type: 'info' });
     });
   };
 
@@ -174,17 +187,6 @@ export default function ShopClient({ initialProducts, profile }: Props) {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
       {/* Main Column */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Notification Toasts */}
-        {error && (
-          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '12px 16px', borderRadius: '8px', fontSize: '13px' }}>
-            {error}
-          </div>
-        )}
-        {success && (
-          <div style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', padding: '12px 16px', borderRadius: '8px', fontSize: '13px' }}>
-            {success}
-          </div>
-        )}
 
         {/* Overview Stat Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
@@ -686,6 +688,26 @@ export default function ShopClient({ initialProducts, profile }: Props) {
           </div>
         </div>
       )}
+
+      {/* Delete Product Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(deletingProductId)}
+        title="Hapus Produk dari Toko?"
+        message="Produk ini akan dihapus permanen dari etalase toko kamu. Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Produk"
+        cancelLabel="Batal"
+        isDanger={true}
+        isLoading={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingProductId(null)}
+      />
+
+      {/* Floating Toast Feedback */}
+      <Toast
+        message={toast?.message ?? null}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }

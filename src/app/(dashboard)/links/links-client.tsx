@@ -9,7 +9,12 @@ import {
   toggleLinkActive,
   toggleLinkPinned,
   reorderLinks,
+  archiveLink,
+  bulkUpdateLinks,
+  updateSmartSorting,
 } from '@/app/actions';
+import ConfirmDialog from '@/components/confirm-dialog';
+import Toast from '@/components/toast';
 
 import {
   DndContext,
@@ -29,12 +34,18 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-const BLOCK_TYPES: { type: LinkType | 'spotify' | 'youtube' | 'apple_music'; icon: string; label: string; desc: string }[] = [
-  { type: 'link', icon: '🔗', label: 'Link Standar', desc: 'Tombol link ke website / portfolio' },
+const BLOCK_TYPES: { type: LinkType | 'spotify' | 'youtube' | 'apple_music' | 'soundcloud' | 'vimeo' | 'twitch' | 'lead_form' | 'calendly' | 'cal_com'; icon: string; label: string; desc: string }[] = [
+  { type: 'link', icon: '🔗', label: 'Link Standar', desc: 'Tombol tautan website / portfolio' },
+  { type: 'heading', icon: '📝', label: 'Heading / Kategori Pembatas', desc: 'Judul sub-bab pemisah seksi link' },
+  { type: 'lead_form', icon: '📩', label: 'Form Pengumpul Email (Leads)', desc: 'Kotak pendaftaran newsletter pengunjung' },
+  { type: 'calendly', icon: '📅', label: 'Calendly Booking', desc: 'Widget jadwal temu konsultasi Calendly' },
+  { type: 'cal_com', icon: '📆', label: 'Cal.com Booking', desc: 'Widget booking appointment Cal.com' },
   { type: 'spotify', icon: '🎵', label: 'Spotify Embed', desc: 'Player lagu, album, atau playlist Spotify' },
-  { type: 'youtube', icon: '▶️', label: 'YouTube Video', desc: 'Embed video player YouTube atau Shorts' },
+  { type: 'youtube', icon: '▶️', label: 'YouTube Video', desc: 'Embed player YouTube atau Shorts' },
   { type: 'apple_music', icon: '🍎', label: 'Apple Music', desc: 'Player lagu & album Apple Music' },
-  { type: 'heading', icon: '📝', label: 'Heading Pembatas', desc: 'Judul pemisah seksi antar link' },
+  { type: 'soundcloud', icon: '☁️', label: 'SoundCloud Track', desc: 'Player musik/podcast SoundCloud' },
+  { type: 'vimeo', icon: '🎬', label: 'Vimeo Video', desc: 'Player video Vimeo HD' },
+  { type: 'twitch', icon: '🟣', label: 'Twitch Livestream', desc: 'Embed siaran langsung Twitch' },
   { type: 'spacer', icon: '↕️', label: 'Spacer Jarak', desc: 'Jarak kosong antar link (custom px)' },
   { type: 'text', icon: '📄', label: 'Teks / Pengumuman', desc: 'Paragraf catatan bebas' },
   { type: 'html', icon: '💻', label: 'Custom HTML', desc: 'Widget iframe atau kode HTML custom' },
@@ -46,36 +57,43 @@ interface Props {
   initialLinks: Link[];
   userId: string;
   username: string;
+  smartSortingEnabled?: boolean;
 }
 
 interface SortableItemProps {
   link: Link;
   editingId: string | null;
   isPending: boolean;
+  isSelected: boolean;
   inputStyle: React.CSSProperties;
   getLinkIcon: (link: Link) => string;
   getLinkPreview: (link: Link) => string;
+  onSelectToggle: (id: string) => void;
   onEdit: (id: string) => void;
   onCancelEdit: () => void;
   onUpdate: (id: string, e: React.FormEvent<HTMLFormElement>) => void;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, cur: boolean) => void;
   onTogglePin: (id: string, cur: boolean) => void;
+  onToggleArchive: (id: string, cur: boolean) => void;
 }
 
 function SortableItem({
   link,
   editingId,
   isPending,
+  isSelected,
   inputStyle,
   getLinkIcon,
   getLinkPreview,
+  onSelectToggle,
   onEdit,
   onCancelEdit,
   onUpdate,
   onDelete,
   onToggleActive,
   onTogglePin,
+  onToggleArchive,
 }: SortableItemProps) {
   const {
     attributes,
@@ -90,16 +108,33 @@ function SortableItem({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLocked, setIsLocked] = useState(Boolean(meta.is_locked));
   const [lockType, setLockType] = useState<string>((meta.lock_type as string) || 'pin');
+  const [showUtmBuilder, setShowUtmBuilder] = useState(false);
+  const [utmUrl, setUtmUrl] = useState(link.url || '');
+  const [utmSource, setUtmSource] = useState('');
+  const [utmMedium, setUtmMedium] = useState('');
+  const [utmCampaign, setUtmCampaign] = useState('');
+
+  const isArchived = Boolean(meta.is_archived);
+
+  const applyUtm = () => {
+    try {
+      const urlObj = new URL(utmUrl.startsWith('http') ? utmUrl : `https://${utmUrl}`);
+      if (utmSource) urlObj.searchParams.set('utm_source', utmSource);
+      if (utmMedium) urlObj.searchParams.set('utm_medium', utmMedium);
+      if (utmCampaign) urlObj.searchParams.set('utm_campaign', utmCampaign);
+      setUtmUrl(urlObj.toString());
+      setShowUtmBuilder(false);
+    } catch {}
+  };
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     background: 'var(--surface)',
-    border: isDragging ? '1px solid var(--accent)' : '1px solid var(--border)',
+    border: isDragging ? '1px solid var(--accent)' : isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
     borderRadius: '10px',
     padding: '14px',
-    opacity: isDragging ? 0.5 : link.is_active ? 1 : 0.5,
-    zIndex: isDragging ? 99 : 'auto',
+    opacity: isArchived ? 0.6 : link.is_active ? 1 : 0.5,
   };
 
   return (
@@ -107,59 +142,87 @@ function SortableItem({
       {editingId === link.id ? (
         <form onSubmit={(e) => onUpdate(link.id, e)}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {link.type === 'html' ? (
-              <>
-                <input name="title" type="text" defaultValue={link.title || ''} placeholder="Label / Judul" style={inputStyle} />
-                <textarea
-                  name="html_content"
-                  defaultValue={link.url || ''}
-                  rows={5}
-                  required
-                  placeholder="Kode HTML"
-                  style={{ ...inputStyle, fontFamily: 'var(--font-mono, monospace)', fontSize: '12px', resize: 'vertical' }}
-                />
-              </>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)' }}>
+                Edit {link.type}
+              </span>
+            </div>
+
+            {link.type === 'heading' ? (
+              <input name="title" type="text" defaultValue={link.title || ''} placeholder="Judul Kategori / Heading" required style={inputStyle} />
+            ) : link.type === 'spacer' ? (
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>TINGGI JARAK (px)</label>
+                <input name="url" type="number" defaultValue={link.url || '24'} min="4" max="160" required style={inputStyle} />
+                <input name="title" type="hidden" value="Spacer" />
+              </div>
+            ) : link.type === 'text' && meta?.is_html ? (
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>KODE HTML / EMBED WIDGET</label>
+                <textarea name="html_content" defaultValue={link.url || ''} rows={4} style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '12px' }} />
+                <input name="title" type="text" defaultValue={link.title || 'Custom HTML'} style={{ ...inputStyle, marginTop: '6px' }} placeholder="Label internal" />
+              </div>
+            ) : link.type === 'text' ? (
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>TEKS PENGUMUMAN</label>
+                <textarea name="title" defaultValue={link.title || ''} rows={3} style={inputStyle} />
+              </div>
             ) : (
               <>
-                {(link.type === 'link' || link.type === 'email' || link.type === 'telephone') && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>JUDUL</label>
-                    <input name="title" type="text" defaultValue={link.title || ''} required style={inputStyle} />
-                  </div>
-                )}
-                {link.type !== 'heading' && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>URL / NILAI</label>
-                    <input name="url" type="text" defaultValue={link.url || ''} required style={inputStyle} />
-                  </div>
-                )}
-                {link.type === 'heading' && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>TEKS HEADING</label>
-                    <input name="title" type="text" defaultValue={link.title || ''} required style={inputStyle} />
+                <input name="title" type="text" defaultValue={link.title || ''} placeholder="Judul Link" required style={inputStyle} />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    name="url"
+                    type="text"
+                    value={utmUrl}
+                    onChange={e => setUtmUrl(e.target.value)}
+                    placeholder="https://"
+                    required
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUtmBuilder(!showUtmBuilder)}
+                    title="UTM Builder"
+                    style={{ padding: '0 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    🏷️ UTM
+                  </button>
+                </div>
+
+                {showUtmBuilder && (
+                  <div style={{ padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text)' }}>Built-in UTM Tag Builder</span>
+                    <input type="text" placeholder="utm_source (cth: instagram)" value={utmSource} onChange={e => setUtmSource(e.target.value)} style={inputStyle} />
+                    <input type="text" placeholder="utm_medium (cth: bio)" value={utmMedium} onChange={e => setUtmMedium(e.target.value)} style={inputStyle} />
+                    <input type="text" placeholder="utm_campaign (cth: promo_merdeka)" value={utmCampaign} onChange={e => setUtmCampaign(e.target.value)} style={inputStyle} />
+                    <button type="button" onClick={applyUtm} style={{ padding: '6px', background: 'var(--accent)', color: '#000', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                      Terapkan Parameter UTM
+                    </button>
                   </div>
                 )}
 
-                {/* Subtitle */}
-                {(link.type === 'link' || link.type === 'email' || link.type === 'telephone') && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>SUBTITLE / KETERANGAN</label>
-                    <input name="subtitle" type="text" defaultValue={String(meta.subtitle || '')} placeholder="Deskripsi singkat di bawah judul (opsional)" style={inputStyle} />
-                  </div>
-                )}
+                <input name="subtitle" type="text" defaultValue={String(meta?.subtitle || '')} placeholder="Subtitle / Deskripsi Tambahan (Opsional)" style={inputStyle} />
 
-                {/* Toggle Advanced Controls (Schedule & Gating) */}
+                {/* Advanced Controls */}
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px', marginTop: '4px' }}>
                   <button
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
                     style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: 500 }}
                   >
-                    {showAdvanced ? '▼ Sembunyikan Opsi Lanjutan' : '▶ Jadwal & Kunci Link (Opsional)'}
+                    {showAdvanced ? '▼ Sembunyikan Opsi Lanjutan' : '▶ Jadwal, Gating & Spotlight (Opsional)'}
                   </button>
 
                   {showAdvanced && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer' }}>
+                          <input type="checkbox" name="is_featured" defaultChecked={Boolean(meta.is_featured)} />
+                          <span>⭐ Jadikan Spotlight / Featured (Menonjol & Glowing)</span>
+                        </label>
+                      </div>
+
                       <div>
                         <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>🕒 Jadwal Mulai Tayang</label>
                         <input name="schedule_start" type="datetime-local" defaultValue={String(meta.schedule_start || '')} style={inputStyle} />
@@ -179,6 +242,7 @@ function SortableItem({
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
                             <select name="lock_type" value={lockType} onChange={e => setLockType(e.target.value)} style={inputStyle}>
                               <option value="pin">🔑 Kunci dengan PIN / Sandi</option>
+                              <option value="subscribe">📩 Kunci Email (Subscribe to Unlock)</option>
                               <option value="age">🔞 Verifikasi Usia 18+</option>
                               <option value="sensitive">⚠️ Peringatan Konten Sensitif</option>
                             </select>
@@ -205,8 +269,14 @@ function SortableItem({
           </div>
         </form>
       ) : (
-        <div className="link-card-item">
+        <div className="link-card-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => onSelectToggle(link.id)}
+              style={{ cursor: 'pointer', accentColor: 'var(--accent)' }}
+            />
             {/* Drag Handle */}
             <span
               {...attributes}
@@ -228,7 +298,13 @@ function SortableItem({
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 {link.is_pinned && <span style={{ fontSize: '10px', background: 'rgba(74,222,128,0.15)', color: 'var(--accent)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>PIN</span>}
-                {Boolean(meta.is_locked) && <span style={{ fontSize: '10px', background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>🔒 TERKUNCI</span>}
+                {Boolean(meta.is_featured) && <span style={{ fontSize: '10px', background: 'rgba(125,249,182,0.2)', color: 'var(--accent)', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>⭐ SPOTLIGHT</span>}
+                {isArchived && <span style={{ fontSize: '10px', background: 'rgba(148,163,184,0.2)', color: '#94a3b8', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>📦 DIARSIPKAN</span>}
+                {Boolean(meta.is_locked) && (
+                  <span style={{ fontSize: '10px', background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                    {meta.lock_type === 'subscribe' ? '📩 GATED (EMAIL)' : '🔒 TERKUNCI'}
+                  </span>
+                )}
                 {Boolean(meta.schedule_start || meta.schedule_end) && <span style={{ fontSize: '10px', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>🕒 TERJADWAL</span>}
                 <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                   {link.title || link.type}
@@ -255,17 +331,19 @@ function SortableItem({
                   fontSize: '11px',
                   cursor: 'pointer',
                 }}
-              >📌</button>
+              >
+                📌
+              </button>
             )}
             <button
               type="button"
               onClick={() => onToggleActive(link.id, link.is_active)}
               style={{
-                padding: '5px 8px',
+                padding: '5px 9px',
                 background: 'var(--bg)',
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
-                color: link.is_active ? 'var(--success)' : 'var(--text-dim)',
+                color: link.is_active ? '#4ade80' : 'var(--text-dim)',
                 fontSize: '11px',
                 fontWeight: 500,
                 cursor: 'pointer',
@@ -275,9 +353,25 @@ function SortableItem({
             </button>
             <button
               type="button"
+              onClick={() => onToggleArchive(link.id, isArchived)}
+              title={isArchived ? 'Pulihkan dari Arsip' : 'Arsipkan Link'}
+              style={{
+                padding: '5px 9px',
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                color: isArchived ? 'var(--accent)' : 'var(--text-dim)',
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              {isArchived ? '📂 Pulihkan' : '📦 Arsip'}
+            </button>
+            <button
+              type="button"
               onClick={() => onEdit(link.id)}
               style={{
-                padding: '5px 10px',
+                padding: '5px 9px',
                 background: 'var(--bg)',
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
@@ -292,7 +386,7 @@ function SortableItem({
               type="button"
               onClick={() => onDelete(link.id)}
               style={{
-                padding: '5px 10px',
+                padding: '5px 9px',
                 background: 'rgba(255,77,77,0.1)',
                 border: '1px solid rgba(255,77,77,0.2)',
                 borderRadius: '6px',
@@ -310,16 +404,31 @@ function SortableItem({
   );
 }
 
-export default function LinksClient({ initialLinks, username }: Props) {
+export default function LinksClient({ initialLinks, username, smartSortingEnabled = false }: Props) {
   const [links, setLinks] = useState<Link[]>(initialLinks);
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'archived'>('all');
+  const [smartSort, setSmartSort] = useState(smartSortingEnabled);
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' | 'info' | 'danger' } | null>(null);
+
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Add Form State
   const [isAddLocked, setIsAddLocked] = useState(false);
   const [addLockType, setAddLockType] = useState('pin');
   const [showAddAdvanced, setShowAddAdvanced] = useState(false);
+  const [addTitle, setAddTitle] = useState('');
+  const [addUrl, setAddUrl] = useState('');
+  const [addSubtitle, setAddSubtitle] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [showAiModal, setShowAiModal] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -355,6 +464,7 @@ export default function LinksClient({ initialLinks, username }: Props) {
 
     startTransition(async () => {
       await reorderLinks(linkOrders);
+      setToast({ message: 'Urutan link diperbarui!', type: 'success' });
       refreshPreview();
     });
   };
@@ -370,11 +480,17 @@ export default function LinksClient({ initialLinks, username }: Props) {
       const fd = new FormData(form);
       if (selectedType) fd.set('type', selectedType);
       const result = await createLink(fd);
-      if (result?.error) setError(result.error);
-      else {
+      if (result?.error) {
+        setError(result.error);
+        setToast({ message: result.error, type: 'error' });
+      } else {
         setSelectedType(null);
         setShowBlockModal(false);
         setError(null);
+        setAddTitle('');
+        setAddUrl('');
+        setAddSubtitle('');
+        setToast({ message: 'Tautan baru berhasil ditambahkan!', type: 'success' });
         refreshLinks();
       }
     });
@@ -384,20 +500,30 @@ export default function LinksClient({ initialLinks, username }: Props) {
     e.preventDefault();
     startTransition(async () => {
       const result = await updateLink(id, new FormData(e.currentTarget));
-      if (result?.error) setError(result.error);
-      else {
+      if (result?.error) {
+        setError(result.error);
+        setToast({ message: result.error, type: 'error' });
+      } else {
         setEditingId(null);
         setError(null);
+        setToast({ message: 'Tautan berhasil diperbarui!', type: 'success' });
         refreshLinks();
       }
     });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Hapus blok ini?')) return;
+  const handleDelete = (id: string) => {
+    setDeletingLinkId(id);
+  };
+
+  const handleConfirmSingleDelete = () => {
+    if (!deletingLinkId) return;
+    const idToDelete = deletingLinkId;
+    setDeletingLinkId(null);
     startTransition(async () => {
-      await deleteLink(id);
-      setLinks(prev => prev.filter(l => l.id !== id));
+      await deleteLink(idToDelete);
+      setLinks(prev => prev.filter(l => l.id !== idToDelete));
+      setToast({ message: 'Tautan berhasil dihapus!', type: 'success' });
       refreshPreview();
     });
   };
@@ -406,6 +532,7 @@ export default function LinksClient({ initialLinks, username }: Props) {
     startTransition(async () => {
       await toggleLinkActive(id, cur);
       setLinks(prev => prev.map(l => l.id === id ? { ...l, is_active: !cur } : l));
+      setToast({ message: cur ? 'Tautan dinonaktifkan' : 'Tautan diaktifkan', type: 'info' });
       refreshPreview();
     });
   };
@@ -414,73 +541,150 @@ export default function LinksClient({ initialLinks, username }: Props) {
     startTransition(async () => {
       await toggleLinkPinned(id, cur);
       setLinks(prev => prev.map(l => l.id === id ? { ...l, is_pinned: !cur } : l));
+      setToast({ message: cur ? 'Tautan dilepas dari pin' : 'Tautan dipin ke atas', type: 'info' });
       refreshPreview();
     });
   };
 
-  const inputStyle = {
-    width: '100%', padding: '9px 13px', background: 'var(--bg)',
-    border: '1px solid var(--border)', borderRadius: '7px',
-    color: 'var(--text)', fontSize: '14px', outline: 'none', boxSizing: 'border-box' as const,
+  const handleToggleArchive = (id: string, isArchived: boolean) => {
+    startTransition(async () => {
+      await archiveLink(id, !isArchived);
+      setLinks(prev => prev.map(l => {
+        if (l.id === id) {
+          const meta = (l.custom_css as Record<string, unknown> | null) || {};
+          return { ...l, custom_css: { ...meta, is_archived: !isArchived } };
+        }
+        return l;
+      }));
+      setToast({ message: isArchived ? 'Tautan dipulihkan dari arsip' : 'Tautan berhasil diarsipkan', type: 'info' });
+      refreshPreview();
+    });
   };
 
-  const getLinkIcon = (link: Link) => {
-    const meta = link.custom_css as Record<string, unknown> | null;
-    if (meta?.embed_type === 'spotify') return '🎵';
-    if (meta?.embed_type === 'youtube') return '▶️';
-    if (meta?.embed_type === 'apple_music') return '🍎';
-    if (link.type === 'heading') return '📝';
-    if (link.type === 'text') return '📄';
-    if (link.type === 'spacer') return '↕️';
-    if (link.type === 'email') return '📧';
-    if (link.type === 'telephone') return '📞';
-    if (link.type === 'html') return '💻';
+  const handleToggleSmartSort = () => {
+    const nextVal = !smartSort;
+    setSmartSort(nextVal);
+    startTransition(async () => {
+      await updateSmartSorting(nextVal);
+      setToast({ message: nextVal ? 'Smart Auto-Sort diaktifkan' : 'Smart Auto-Sort dinonaktifkan', type: 'info' });
+      refreshPreview();
+    });
+  };
+
+  const handleBulkAction = (action: 'activate' | 'deactivate' | 'archive' | 'unarchive' | 'delete') => {
+    if (selectedIds.length === 0) return;
+    if (action === 'delete') {
+      setShowBulkDeleteConfirm(true);
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await bulkUpdateLinks(selectedIds, action);
+      if (res?.error) {
+        setError(res.error);
+        setToast({ message: res.error, type: 'error' });
+      } else {
+        setSelectedIds([]);
+        setToast({ message: `Aksi massal berhasil diterapkan (${selectedIds.length} item)`, type: 'success' });
+        refreshLinks();
+      }
+    });
+  };
+
+  const handleConfirmBulkDelete = () => {
+    const count = selectedIds.length;
+    setShowBulkDeleteConfirm(false);
+    startTransition(async () => {
+      const res = await bulkUpdateLinks(selectedIds, 'delete');
+      if (res?.error) {
+        setError(res.error);
+        setToast({ message: res.error, type: 'error' });
+      } else {
+        setSelectedIds([]);
+        setToast({ message: `${count} tautan berhasil dihapus!`, type: 'success' });
+        refreshLinks();
+      }
+    });
+  };
+
+  const handleGenerateAiCopy = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsAiLoading(true);
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'link-copy', input: aiPrompt }),
+      });
+      const data = await res.json();
+      if (data?.copy) {
+        setAddTitle(data.copy.title || '');
+        setAddSubtitle(data.copy.subtitle || '');
+        setShowAiModal(false);
+      }
+    } catch {
+      setError('Gagal membuat copy AI');
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const getLinkIcon = (l: Link) => {
+    const meta = (l.custom_css as Record<string, unknown> | null) || {};
+    if (meta.is_html) return '💻';
+    if (meta.embed_type === 'spotify') return '🎵';
+    if (meta.embed_type === 'youtube') return '▶️';
+    if (meta.embed_type === 'apple_music') return '🍎';
+    if (meta.embed_type === 'soundcloud') return '☁️';
+    if (meta.embed_type === 'vimeo') return '🎬';
+    if (meta.embed_type === 'twitch') return '🟣';
+    if (meta.embed_type === 'calendly') return '📅';
+    if (meta.embed_type === 'cal_com') return '📆';
+    if (l.type === 'heading') return '📝';
+    if (l.type === 'lead_form' || meta.is_lead_form) return '📩';
+    if (l.type === 'spacer') return '↕️';
+    if (l.type === 'text') return '📄';
+    if (l.type === 'email') return '📧';
+    if (l.type === 'telephone') return '📞';
     return '🔗';
   };
 
-  const getLinkPreview = (link: Link) => {
-    const meta = link.custom_css as Record<string, unknown> | null;
-    if (meta?.subtitle) return `${link.url || ''} • "${meta.subtitle}"`;
-    if (link.type === 'heading') return `Heading: "${link.title || ''}"`;
-    if (link.type === 'text') return 'Blok catatan teks';
-    if (link.type === 'spacer') return 'Spacer pembatas';
-    if (link.type === 'email') return `mailto:${link.url || ''}`;
-    if (link.type === 'telephone') return `tel:${link.url || ''}`;
-    if (link.type === 'html') return link.title || 'Blok HTML Kustom';
-    return link.url || '';
+  const getLinkPreview = (l: Link) => {
+    const meta = (l.custom_css as Record<string, unknown> | null) || {};
+    if (meta.is_html) return '<custom HTML embed>';
+    if (l.type === 'spacer') return `Tinggi Jarak: ${l.url || '24'}px`;
+    if (l.type === 'heading') return `Heading Pembatas`;
+    if (l.type === 'lead_form' || meta.is_lead_form) return `Form Pengumpul Email Pengunjung`;
+    if (l.type === 'text') return l.title || 'Teks pengumuman';
+    return l.url || '';
   };
 
-  const renderAddForm = () => {
-    if (selectedType === 'html') return (
-      <>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>LABEL / JUDUL (OPSIONAL)</label>
-          <input name="title" type="text" placeholder="Contoh: Pemutar Musik / Widget" style={inputStyle} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>KODE HTML / EMBED</label>
-          <textarea
-            name="html_content"
-            placeholder={'<div style="background: #222; padding: 12px; border-radius: 8px;">\n  Halo dunia!\n</div>'}
-            rows={5}
-            required
-            style={{ ...inputStyle, fontFamily: 'var(--font-mono, monospace)', fontSize: '12px', resize: 'vertical' }}
-          />
-        </div>
-      </>
-    );
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    background: 'var(--bg)',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    color: 'var(--text)',
+    fontSize: '13px',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
 
+  const displayedLinks = links.filter(l => {
+    const meta = (l.custom_css as Record<string, unknown> | null) || {};
+    const isArchived = Boolean(meta.is_archived);
+    if (activeTab === 'active') return l.is_active && !isArchived;
+    if (activeTab === 'archived') return isArchived;
+    return true;
+  });
+
+  const renderAddForm = () => {
     if (selectedType === 'heading') return (
       <div>
-        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>TEKS HEADING PEMBATAS</label>
-        <input name="title" type="text" placeholder="Contoh: Karya & Portfolio" required style={inputStyle} />
-      </div>
-    );
-
-    if (selectedType === 'text') return (
-      <div>
-        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>TEKS CATATAN</label>
-        <textarea name="url" placeholder="Tulis catatan atau pengumuman..." required rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+        <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>TEKS HEADING / KATEGORI</label>
+        <input name="title" type="text" placeholder="Contoh: Media Sosial & Komunitas" required style={inputStyle} />
+        <input name="url" type="hidden" value="" />
       </div>
     );
 
@@ -492,85 +696,92 @@ export default function LinksClient({ initialLinks, username }: Props) {
       </div>
     );
 
-    if (selectedType === 'spotify') return (
+    if (selectedType === 'calendly') return (
       <>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL PLAYER</label>
-          <input name="title" type="text" placeholder="Contoh: Lagu Favorit Saya" required style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL BOOKING</label>
+          <input name="title" type="text" placeholder="Contoh: Jadwalkan Konsultasi 1-on-1" required style={inputStyle} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>URL SPOTIFY (TRACK / ALBUM / PLAYLIST)</label>
-          <input name="url" type="url" placeholder="https://open.spotify.com/track/..." required style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>URL CALENDLY</label>
+          <input name="url" type="url" placeholder="https://calendly.com/username/meeting" required style={inputStyle} />
         </div>
       </>
     );
 
-    if (selectedType === 'youtube') return (
+    if (selectedType === 'cal_com') return (
       <>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL VIDEO</label>
-          <input name="title" type="text" placeholder="Contoh: Video Klip Terbaru" required style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL BOOKING</label>
+          <input name="title" type="text" placeholder="Contoh: Booking Appointment Cal.com" required style={inputStyle} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>URL YOUTUBE (VIDEO / SHORTS / YOcloud)</label>
-          <input name="url" type="url" placeholder="https://youtube.com/watch?v=... atau https://youtu.be/..." required style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>URL CAL.COM</label>
+          <input name="url" type="url" placeholder="https://cal.com/username" required style={inputStyle} />
         </div>
       </>
     );
 
-    if (selectedType === 'apple_music') return (
+    if (selectedType === 'lead_form') return (
       <>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL PLAYER</label>
-          <input name="title" type="text" placeholder="Contoh: Apple Music Playlist" required style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL FORM NEWSLETTER</label>
+          <input name="title" type="text" placeholder="Contoh: Gabung Newsletter Mingguan" required style={inputStyle} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>URL APPLE MUSIC</label>
-          <input name="url" type="url" placeholder="https://music.apple.com/..." required style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>SUBTITLE / AJAKAN (OPSIONAL)</label>
+          <input name="subtitle" type="text" placeholder="Dapatkan tips eksklusif langsung ke email kamu" style={inputStyle} />
         </div>
       </>
     );
 
-    if (selectedType === 'email') return (
-      <>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL TOMBOL</label>
-          <input name="title" type="text" placeholder="Contoh: Email Saya" required style={inputStyle} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>ALAMAT EMAIL</label>
-          <input name="url" type="email" placeholder="kamu@email.com" required style={inputStyle} />
-        </div>
-      </>
-    );
-
-    if (selectedType === 'telephone') return (
-      <>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL TOMBOL</label>
-          <input name="title" type="text" placeholder="Contoh: Hubungi Saya" required style={inputStyle} />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>NOMOR TELEPON</label>
-          <input name="url" type="tel" placeholder="+62..." required style={inputStyle} />
-        </div>
-      </>
-    );
-
-    // Default 'link'
     return (
       <>
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>JUDUL LINK</label>
-          <input name="title" type="text" placeholder="Contoh: Instagram / Website Resmi" required style={inputStyle} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)' }}>JUDUL LINK</label>
+            <button
+              type="button"
+              onClick={() => setShowAiModal(true)}
+              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+            >
+              ✨ Buat Judul AI
+            </button>
+          </div>
+          <input
+            name="title"
+            type="text"
+            value={addTitle}
+            onChange={e => setAddTitle(e.target.value)}
+            placeholder="Contoh: Website Resmi / Instagram"
+            required
+            style={inputStyle}
+          />
         </div>
+
         <div>
           <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>URL TUJUAN</label>
-          <input name="url" type="url" placeholder="https://..." required style={inputStyle} />
+          <input
+            name="url"
+            type="url"
+            value={addUrl}
+            onChange={e => setAddUrl(e.target.value)}
+            placeholder="https://"
+            required
+            style={inputStyle}
+          />
         </div>
+
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>SUBTITLE (OPSIONAL)</label>
-          <input name="subtitle" type="text" placeholder="Contoh: Dapatkan diskon 20%" style={inputStyle} />
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-dim)', marginBottom: '6px' }}>SUBTITLE / DESKRIPSI (OPSIONAL)</label>
+          <input
+            name="subtitle"
+            type="text"
+            value={addSubtitle}
+            onChange={e => setAddSubtitle(e.target.value)}
+            placeholder="Contoh: Dapatkan diskon 20%"
+            style={inputStyle}
+          />
         </div>
 
         {/* Advanced Scheduling and Gating */}
@@ -580,11 +791,18 @@ export default function LinksClient({ initialLinks, username }: Props) {
             onClick={() => setShowAddAdvanced(!showAddAdvanced)}
             style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: 500 }}
           >
-            {showAddAdvanced ? '▼ Sembunyikan Opsi Lanjutan' : '▶ Jadwal & Kunci Link (Opsional)'}
+            {showAddAdvanced ? '▼ Sembunyikan Opsi Lanjutan' : '▶ Jadwal, Gating & Spotlight (Opsional)'}
           </button>
 
           {showAddAdvanced && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px', padding: '12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer' }}>
+                  <input type="checkbox" name="is_featured" />
+                  <span>⭐ Jadikan Spotlight / Featured (Menonjol & Glowing)</span>
+                </label>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>🕒 Jadwal Mulai Tayang</label>
                 <input name="schedule_start" type="datetime-local" style={inputStyle} />
@@ -604,6 +822,7 @@ export default function LinksClient({ initialLinks, username }: Props) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
                     <select name="lock_type" value={addLockType} onChange={e => setAddLockType(e.target.value)} style={inputStyle}>
                       <option value="pin">🔑 Kunci dengan PIN / Sandi</option>
+                      <option value="subscribe">📩 Kunci Email (Subscribe to Unlock)</option>
                       <option value="age">🔞 Verifikasi Usia 18+</option>
                       <option value="sensitive">⚠️ Peringatan Konten Sensitif</option>
                     </select>
@@ -627,6 +846,152 @@ export default function LinksClient({ initialLinks, username }: Props) {
         {error && (
           <div style={{ background: 'rgba(255,77,77,0.12)', border: '1px solid rgba(255,77,77,0.3)', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '14px', color: 'var(--danger)' }}>
             {error}
+          </div>
+        )}
+
+        {/* Smart Sorting Banner */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>⚡</span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Smart Sorting (Auto-Rank)</span>
+              {smartSort && <span style={{ fontSize: '10px', background: 'rgba(74,222,128,0.15)', color: 'var(--accent)', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>AKTIF</span>}
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: '2px 0 0' }}>
+              Otomatis menaikkan tautan yang paling sering diklik ke posisi teratas.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleSmartSort}
+            style={{
+              padding: '6px 12px',
+              background: smartSort ? 'var(--accent)' : 'var(--bg)',
+              color: smartSort ? '#000' : 'var(--text-muted)',
+              border: `1px solid ${smartSort ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {smartSort ? 'Nonaktifkan' : 'Aktifkan'}
+          </button>
+        </div>
+
+        {/* Tab Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('all')}
+            style={{
+              padding: '6px 14px',
+              background: activeTab === 'all' ? 'var(--accent)' : 'var(--surface)',
+              color: activeTab === 'all' ? '#000' : 'var(--text-muted)',
+              border: `1px solid ${activeTab === 'all' ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Semua ({links.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('active')}
+            style={{
+              padding: '6px 14px',
+              background: activeTab === 'active' ? 'var(--accent)' : 'var(--surface)',
+              color: activeTab === 'active' ? '#000' : 'var(--text-muted)',
+              border: `1px solid ${activeTab === 'active' ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Aktif ({links.filter(l => l.is_active && !(l.custom_css as Record<string, unknown> | null)?.is_archived).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('archived')}
+            style={{
+              padding: '6px 14px',
+              background: activeTab === 'archived' ? 'var(--accent)' : 'var(--surface)',
+              color: activeTab === 'archived' ? '#000' : 'var(--text-muted)',
+              border: `1px solid ${activeTab === 'archived' ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Diarsipkan ({links.filter(l => Boolean((l.custom_css as Record<string, unknown> | null)?.is_archived)).length})
+          </button>
+        </div>
+
+        {/* Bulk Action Toolbar */}
+        {selectedIds.length > 0 && (
+          <div style={{ background: 'var(--bg2)', border: '1px solid var(--accent)', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+              {selectedIds.length} link terpilih
+            </span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button onClick={() => handleBulkAction('activate')} style={{ padding: '5px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: '#4ade80', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
+                ✓ Aktifkan
+              </button>
+              <button onClick={() => handleBulkAction('deactivate')} style={{ padding: '5px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', fontSize: '12px', cursor: 'pointer' }}>
+                Off-kan
+              </button>
+              <button onClick={() => handleBulkAction('archive')} style={{ padding: '5px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: '#94a3b8', fontSize: '12px', cursor: 'pointer' }}>
+                📦 Arsipkan
+              </button>
+              <button onClick={() => handleBulkAction('delete')} style={{ padding: '5px 10px', background: 'rgba(255,77,77,0.15)', border: '1px solid rgba(255,77,77,0.3)', borderRadius: '6px', color: 'var(--danger)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}>
+                🗑️ Hapus
+              </button>
+              <button onClick={() => setSelectedIds([])} style={{ padding: '5px 8px', background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '12px', cursor: 'pointer' }}>
+                Batal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* AI Copywriter Modal */}
+        {showAiModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '24px', width: '100%', maxWidth: '440px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>
+                ✨ AI Copywriter
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '14px' }}>
+                Jelaskan tautan/produk kamu, AI akan membuat judul & subtitle yang menarik pengunjung.
+              </p>
+              <textarea
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                placeholder="Contoh: E-book panduan belajar trading crypto pemula diskon 50%"
+                rows={3}
+                style={{ ...inputStyle, marginBottom: '12px' }}
+              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  disabled={isAiLoading || !aiPrompt.trim()}
+                  onClick={handleGenerateAiCopy}
+                  style={{ flex: 1, padding: '9px', background: 'var(--accent)', color: '#000', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: isAiLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {isAiLoading ? 'Memproses AI...' : 'Buat Copy Sekarang'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAiModal(false)}
+                  style={{ padding: '9px 14px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-dim)', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -677,38 +1042,41 @@ export default function LinksClient({ initialLinks, username }: Props) {
           </form>
         ) : (
           <button type="button" onClick={() => setShowBlockModal(true)} style={{ marginBottom: '20px', padding: '10px 20px', background: 'var(--accent)', color: '#000', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-            + Tambah Link / Embed
+            + Tambah Blok / Embed
           </button>
         )}
 
-        {/* Empty State */}
-        {links.length === 0 && !selectedType && (
+        {/* Links List */}
+        {displayedLinks.length === 0 && !selectedType && (
           <div style={{ textAlign: 'center', padding: '48px 24px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
             <p style={{ fontSize: '32px', marginBottom: '12px' }}>🌿</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: 500 }}>Belum ada blok</p>
-            <p style={{ color: 'var(--text-dim)', fontSize: '13px', marginTop: '4px' }}>Tambah link atau media embed pertama kamu</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '15px', fontWeight: 500 }}>
+              {activeTab === 'archived' ? 'Tidak ada link yang diarsipkan' : 'Belum ada link'}
+            </p>
           </div>
         )}
 
-        {/* Sortable Links List */}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={links.map(l => l.id)} strategy={verticalListSortingStrategy}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {links.map((link) => (
+          <SortableContext items={displayedLinks.map(l => l.id)} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {displayedLinks.map(link => (
                 <SortableItem
                   key={link.id}
                   link={link}
                   editingId={editingId}
                   isPending={isPending}
+                  isSelected={selectedIds.includes(link.id)}
                   inputStyle={inputStyle}
                   getLinkIcon={getLinkIcon}
                   getLinkPreview={getLinkPreview}
-                  onEdit={(id) => setEditingId(id)}
+                  onSelectToggle={(id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                  onEdit={id => setEditingId(id)}
                   onCancelEdit={() => setEditingId(null)}
                   onUpdate={handleUpdate}
                   onDelete={handleDelete}
                   onToggleActive={handleToggleActive}
                   onTogglePin={handleTogglePin}
+                  onToggleArchive={handleToggleArchive}
                 />
               ))}
             </div>
@@ -716,59 +1084,60 @@ export default function LinksClient({ initialLinks, username }: Props) {
         </DndContext>
       </div>
 
-      {/* Phone Mockup Preview */}
-      <div style={{ position: 'sticky', top: '24px' }}>
-        <div style={{
-          width: '100%',
-          maxWidth: '300px',
-          height: '600px',
-          margin: '0 auto',
-          background: '#000',
-          borderRadius: '36px',
-          border: '4px solid var(--border-hover)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '10px',
-          boxSizing: 'border-box',
-          position: 'relative',
-        }}>
-          {/* Dynamic Island / Notch */}
-          <div style={{
-            width: '80px',
-            height: '18px',
-            background: '#000',
-            borderRadius: '20px',
-            margin: '0 auto 6px',
-            zIndex: 10,
-          }} />
-          {/* Screen Content */}
-          <div style={{
-            flex: 1,
-            borderRadius: '26px',
-            overflow: 'hidden',
-            background: 'var(--bg)',
-          }}>
-            <iframe
-              ref={iframeRef}
-              src={`/@${username}?preview=true`}
-              style={{ width: '100%', height: '100%', border: 'none' }}
-              title="Live preview"
-              onLoad={(e) => {
-                try {
-                  const iframe = e.currentTarget as HTMLIFrameElement;
-                  if (iframe.contentDocument) {
-                    iframe.contentDocument.querySelectorAll('a, button').forEach(el => {
-                      el.addEventListener('click', (ev) => ev.preventDefault());
-                    });
-                  }
-                } catch {}
-              }}
-            />
+      {/* Live Phone Preview */}
+      <div className="preview-container" style={{ position: 'sticky', top: '24px' }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '24px', padding: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)', width: '310px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 8px', borderBottom: '1px solid var(--border)', marginBottom: '8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Live Preview</span>
+            <button
+              type="button"
+              onClick={refreshPreview}
+              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              ↻ Refresh
+            </button>
           </div>
+          <iframe
+            ref={iframeRef}
+            src={`/@${username}?preview=true`}
+            title="Profil Preview"
+            style={{ width: '100%', height: '540px', border: 'none', borderRadius: '16px', background: '#000' }}
+          />
         </div>
       </div>
+
+      {/* Single Link Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={Boolean(deletingLinkId)}
+        title="Hapus Link Ini?"
+        message="Tautan ini akan dihapus permanen dari profil biolink kamu. Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus Link"
+        cancelLabel="Batal"
+        isDanger={true}
+        isLoading={isPending}
+        onConfirm={handleConfirmSingleDelete}
+        onCancel={() => setDeletingLinkId(null)}
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={showBulkDeleteConfirm}
+        title={`Hapus ${selectedIds.length} Link Terpilih?`}
+        message={`Sebanyak ${selectedIds.length} tautan yang dipilih akan dihapus secara bersamaan. Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Ya, Hapus Semua Terpilih"
+        cancelLabel="Batal"
+        isDanger={true}
+        isLoading={isPending}
+        onConfirm={handleConfirmBulkDelete}
+        onCancel={() => setShowBulkDeleteConfirm(false)}
+      />
+
+      {/* Floating Toast Feedback */}
+      <Toast
+        message={toast?.message ?? null}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }

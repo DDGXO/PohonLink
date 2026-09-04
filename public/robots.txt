@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://pohonlink.dgxohq.com/sitemap.xml

@@ -1,5 +1,5 @@
 export type UserRole = 'user' | 'vip' | 'admin';
-export type LinkType = 'link' | 'heading' | 'text' | 'spacer' | 'email' | 'telephone' | 'html';
+export type LinkType = 'link' | 'heading' | 'text' | 'spacer' | 'email' | 'telephone' | 'html' | 'header' | 'lead_form' | 'vcard';
 export type EventType = 'pageview' | 'click';
 
 export interface ProfileSettings {
@@ -7,7 +7,20 @@ export interface ProfileSettings {
   show_share_button: boolean;
   show_verified_badge: boolean;
   hide_username?: boolean;
-  avatar_shape?: 'circle' | 'rounded' | 'square';
+  avatar_shape?: 'circle' | 'rounded' | 'square' | 'wide' | 'original' | 'custom';
+  avatar_masking?: 'crop' | 'full';
+  avatar_fit?: 'cover' | 'contain' | 'fill';
+  avatar_zoom?: number;
+  avatar_size?: 'small' | 'medium' | 'large' | 'xlarge';
+  avatar_border_style?: 'none' | 'solid' | 'dashed' | 'dotted' | 'double' | 'glow';
+  avatar_border_width?: number;
+  avatar_border_color?: string;
+  avatar_shadow?: 'none' | 'soft' | 'hard' | 'glow';
+  avatar_shadow_color?: string;
+  avatar_radius_custom?: number;
+  avatar_offset_x?: number;
+  avatar_offset_y?: number;
+  avatar_video_url?: string;
   social_position?: 'top' | 'bottom';
   show_footer?: boolean;
   custom_footer_text?: string;
@@ -15,6 +28,47 @@ export interface ProfileSettings {
   enable_shop?: boolean;
   shop_title?: string;
   shop_layout?: 'grid' | 'list';
+  smart_sorting_enabled?: boolean;
+  auto_redirect?: {
+    enabled: boolean;
+    url: string;
+  };
+  seo_meta?: {
+    title?: string;
+    description?: string;
+    og_image_url?: string;
+    meta_keywords?: string;
+  };
+  vcard?: {
+    enabled: boolean;
+    full_name?: string;
+    phone?: string;
+    email?: string;
+    company?: string;
+    job_title?: string;
+    note?: string;
+  };
+  marketing_pixels?: {
+    meta_pixel_id?: string;
+    ga4_id?: string;
+    gtm_id?: string;
+    tiktok_pixel_id?: string;
+    pinterest_tag_id?: string;
+  };
+  auto_dm?: {
+    enabled: boolean;
+    keyword: string;
+    message: string;
+  };
+}
+
+export interface LeadCapture {
+  id: string;
+  profile_id: string;
+  name: string;
+  email: string;
+  note?: string;
+  created_at: string;
 }
 
 export interface ProductMeta {
@@ -56,7 +110,7 @@ export interface ThemeConfig {
   btn_shadow_color?: string;
   btn_glass_opacity?: number;
   btn_glass_blur?: number;
-  layout_type?: 'list' | 'grid' | 'carousel';
+  layout_type?: 'list' | 'grid' | 'carousel' | 'carousel_stories';
   font: string;
   animated_bg?:
     | 'matrix'

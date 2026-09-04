@@ -46,9 +46,9 @@ export function sanitizeHtml(html: string | null | undefined): string {
 }
 
 /**
- * Format media URL (Spotify, YouTube, Apple Music) menjadi direct embed iframe URL
+ * Format media URL (Spotify, YouTube, Apple Music, SoundCloud, Vimeo, Twitch) menjadi direct embed iframe URL
  */
-export function getMediaEmbedUrl(rawUrl: string): { type: 'spotify' | 'youtube' | 'apple_music' | 'other'; embedUrl: string } | null {
+export function getMediaEmbedUrl(rawUrl: string): { type: 'spotify' | 'youtube' | 'apple_music' | 'soundcloud' | 'vimeo' | 'twitch' | 'calendly' | 'cal_com' | 'other'; embedUrl: string } | null {
   if (!rawUrl) return null;
   const url = rawUrl.trim();
 
@@ -81,6 +81,39 @@ export function getMediaEmbedUrl(rawUrl: string): { type: 'spotify' | 'youtube' 
     if (url.includes('embed.music.apple.com')) return { type: 'apple_music', embedUrl: url };
     const embedUrl = url.replace('music.apple.com', 'embed.music.apple.com');
     return { type: 'apple_music', embedUrl };
+  }
+
+  // 4. SoundCloud
+  if (url.includes('soundcloud.com')) {
+    const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%237df9b6&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false`;
+    return { type: 'soundcloud', embedUrl };
+  }
+
+  // 5. Vimeo
+  if (url.includes('vimeo.com')) {
+    const match = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|)(\d+)/);
+    const vimeoId = match ? match[3] : '';
+    if (vimeoId) {
+      return { type: 'vimeo', embedUrl: `https://player.vimeo.com/video/${vimeoId}` };
+    }
+  }
+
+  // 6. Twitch
+  if (url.includes('twitch.tv')) {
+    const channelName = url.split('twitch.tv/')[1]?.split('/')[0]?.split('?')[0] || '';
+    if (channelName && !['directory', 'videos', 'p'].includes(channelName.toLowerCase())) {
+      return { type: 'twitch', embedUrl: `https://player.twitch.tv/?channel=${channelName}&parent=localhost&parent=phn.my.id&parent=pohonlink.id&autoplay=false` };
+    }
+  }
+
+  // 7. Calendly
+  if (url.includes('calendly.com/')) {
+    return { type: 'calendly', embedUrl: url };
+  }
+
+  // 8. Cal.com
+  if (url.includes('cal.com/')) {
+    return { type: 'cal_com', embedUrl: url };
   }
 
   return null;

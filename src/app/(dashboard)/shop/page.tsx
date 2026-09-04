@@ -4,7 +4,7 @@ import { getAllProducts } from '@/lib/db/queries';
 import ShopClient from './shop-client';
 
 export const metadata = {
-  title: 'Toko / Shop | Pohonlink',
+  title: 'Toko | Pohonlink',
   description: 'Kelola showcase dan katalog produk jualan kamu',
 };
 

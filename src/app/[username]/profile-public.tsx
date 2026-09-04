@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import type { Profile, Link } from '@/types/database';
 import { sanitizeHtml, sanitizeUrl, getMediaEmbedUrl } from '@/lib/utils';
+import { submitLeadCapture } from '@/app/actions';
 import SocialIcon from '@/components/social-icons';
 import AnimatedBackground from '@/components/animated-background';
 
@@ -57,18 +58,79 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
     if (isIframe) return;
 
     // Track pageview via Beacon
-    navigator.sendBeacon('/api/track-view', JSON.stringify({ profileId: profile.id }));
-  }, [profile.id]);
+    navigator.sendBeacon(
+      '/api/track-view',
+      JSON.stringify({
+        profileId: profile.id,
+        referer: typeof document !== 'undefined' ? document.referrer : '',
+        search: typeof window !== 'undefined' ? window.location.search : '',
+      })
+    );
+
+    // Multi-Pixel Tracking Injection
+    const pixels = profile.settings?.marketing_pixels;
+    if (pixels) {
+      if (pixels.ga4_id && !document.getElementById('ga4-script')) {
+        const s = document.createElement('script');
+        s.id = 'ga4-script';
+        s.async = true;
+        s.src = `https://www.googletagmanager.com/gtag/js?id=${pixels.ga4_id}`;
+        document.head.appendChild(s);
+        const inline = document.createElement('script');
+        inline.id = 'ga4-init';
+        inline.innerHTML = `window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${pixels.ga4_id}');`;
+        document.head.appendChild(inline);
+      }
+      if (pixels.meta_pixel_id && !document.getElementById('meta-pixel-script')) {
+        const metaScript = document.createElement('script');
+        metaScript.id = 'meta-pixel-script';
+        metaScript.innerHTML = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '${pixels.meta_pixel_id}');fbq('track', 'PageView');`;
+        document.head.appendChild(metaScript);
+      }
+      if (pixels.tiktok_pixel_id && !document.getElementById('tiktok-pixel-script')) {
+        const ttScript = document.createElement('script');
+        ttScript.id = 'tiktok-pixel-script';
+        ttScript.innerHTML = `!function (w, d, t) { w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)}; ttq.load('${pixels.tiktok_pixel_id}'); ttq.page(); }(window, document, 'ttq');`;
+        document.head.appendChild(ttScript);
+      }
+    }
+  }, [profile.id, profile.settings?.marketing_pixels]);
 
   const executeLinkOpen = (link: Link, href: string) => {
     if (link.type === 'link') {
-      navigator.sendBeacon('/api/track-click', JSON.stringify({ linkId: link.id, profileId: profile.id }));
+      navigator.sendBeacon(
+        '/api/track-click',
+        JSON.stringify({
+          linkId: link.id,
+          profileId: profile.id,
+          referer: typeof document !== 'undefined' ? document.referrer : '',
+          search: typeof window !== 'undefined' ? window.location.search : '',
+        })
+      );
+      
+      // Auto Forward UTM params if outbound
+      let finalHref = href;
+      if (typeof window !== 'undefined' && window.location.search && href.startsWith('http')) {
+        try {
+          const currentParams = new URLSearchParams(window.location.search);
+          const targetUrl = new URL(href);
+          currentParams.forEach((val, key) => {
+            if (key.startsWith('utm_') && !targetUrl.searchParams.has(key)) {
+              targetUrl.searchParams.set(key, val);
+            }
+          });
+          finalHref = targetUrl.toString();
+        } catch {}
+      }
+
       if (profile.settings?.open_links_new_tab) {
-        window.open(href, '_blank', 'noopener,noreferrer');
+        window.open(finalHref, '_blank', 'noopener,noreferrer');
         return;
       }
+      window.location.assign(finalHref);
+    } else {
+      window.location.assign(href);
     }
-    window.location.assign(href);
   };
 
   const handleLinkClick = (link: Link, href: string) => {
@@ -84,7 +146,15 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
 
   const handleProductClick = (product: Link) => {
     if (!product.url) return;
-    navigator.sendBeacon('/api/track-click', JSON.stringify({ linkId: product.id, profileId: profile.id }));
+    navigator.sendBeacon(
+      '/api/track-click',
+      JSON.stringify({
+        linkId: product.id,
+        profileId: profile.id,
+        referer: typeof document !== 'undefined' ? document.referrer : '',
+        search: typeof window !== 'undefined' ? window.location.search : '',
+      })
+    );
     if (profile.settings?.open_links_new_tab) {
       window.open(product.url, '_blank', 'noopener,noreferrer');
       return;
@@ -104,6 +174,14 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
         setLockError('PIN / Sandi salah!');
         return;
       }
+    } else if (lockType === 'subscribe') {
+      const email = pinInput.trim().toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setLockError('Alamat email tidak valid!');
+        return;
+      }
+      // Save lead capture for subscribe to unlock
+      submitLeadCapture(profile.id, 'Subscriber', email, `Unlock: ${activeLockModal.link.title || 'Link'}`);
     }
 
     // Mark as unlocked
@@ -287,41 +365,146 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
         {/* Avatar */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           {(() => {
-            const avatarShape = profile.settings?.avatar_shape || 'circle';
-            const avatarRadius = avatarShape === 'circle' ? '50%' : avatarShape === 'rounded' ? '18px' : '4px';
-            const avatarBorder = avatarShape === 'square' ? 'none' : '3px solid rgba(255,255,255,0.2)';
-            const avatarShadow = avatarShape === 'square' ? 'none' : '0 4px 16px rgba(0,0,0,0.3)';
+            const shape = profile.settings?.avatar_shape || 'circle';
+            const fit = profile.settings?.avatar_fit || 'cover';
+            const zoom = profile.settings?.avatar_zoom ?? 100;
+            const size = profile.settings?.avatar_size || 'medium';
+            const borderStyle = profile.settings?.avatar_border_style || (shape === 'square' ? 'none' : 'solid');
+            const borderWidth = profile.settings?.avatar_border_width ?? (shape === 'square' ? 0 : 2);
+            const borderColor = profile.settings?.avatar_border_color || '#4ade80';
+            const shadow = profile.settings?.avatar_shadow || (shape === 'square' ? 'none' : 'soft');
+            const customRadius = profile.settings?.avatar_radius_custom ?? (shape === 'circle' ? 50 : 16);
+
+            const sizeMap = {
+              small: { base: 72, wideW: 130, wideH: 72, maxW: 130, maxH: 80 },
+              medium: { base: 92, wideW: 170, wideH: 92, maxW: 170, maxH: 110 },
+              large: { base: 116, wideW: 220, wideH: 116, maxW: 220, maxH: 140 },
+              xlarge: { base: 148, wideW: 280, wideH: 148, maxW: 280, maxH: 180 },
+            }[size] || { base: 92, wideW: 170, wideH: 92, maxW: 170, maxH: 110 };
+
+            let w: string | number = sizeMap.base;
+            let h: string | number = sizeMap.base;
+            let r = '50%';
+            let maxW: string | undefined = undefined;
+            let maxH: string | undefined = undefined;
+
+            if (shape === 'circle') {
+              r = '50%';
+            } else if (shape === 'custom') {
+              r = `${customRadius}%`;
+            } else if (shape === 'rounded') {
+              r = size === 'small' ? '12px' : size === 'xlarge' ? '24px' : '18px';
+            } else if (shape === 'square') {
+              r = '4px';
+            } else if (shape === 'wide') {
+              r = '14px';
+              w = sizeMap.wideW;
+              h = sizeMap.wideH;
+            } else if (shape === 'original') {
+              r = '12px';
+              w = 'auto';
+              h = 'auto';
+              maxW = `${sizeMap.maxW}px`;
+              maxH = `${sizeMap.maxH}px`;
+            }
+
+            const effBorderWidth = borderStyle === 'none' ? 0 : borderWidth;
+            const effBorderColor = borderColor || '#4ade80';
+
+            let border = 'none';
+            if (borderStyle !== 'none' && effBorderWidth > 0) {
+              if (borderStyle === 'glow') {
+                border = `${effBorderWidth}px solid ${effBorderColor}`;
+              } else {
+                border = `${effBorderWidth}px ${borderStyle} ${effBorderColor}`;
+              }
+            }
+
+            let boxShadow = 'none';
+            if (borderStyle === 'glow' || shadow === 'glow') {
+              boxShadow = `0 0 ${12 + effBorderWidth * 3}px ${effBorderColor}, 0 4px 16px rgba(0,0,0,0.35)`;
+            } else if (shadow === 'hard') {
+              boxShadow = `4px 4px 0px ${effBorderColor || '#000000'}`;
+            } else if (shadow === 'soft') {
+              boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+            }
+
+            const masking = profile.settings?.avatar_masking || (shape === 'original' ? 'full' : 'crop');
+            const isFullCanvas = masking === 'full';
+
+            const videoAvatar = profile.settings?.avatar_video_url?.trim() || (profile.avatar_url && (profile.avatar_url.endsWith('.mp4') || profile.avatar_url.endsWith('.webm')) ? profile.avatar_url : null);
+
+            const containerStyle: React.CSSProperties = {
+              width: isFullCanvas ? 'auto' : w,
+              height: isFullCanvas ? 'auto' : h,
+              maxWidth: maxW,
+              maxHeight: maxH,
+              borderRadius: r,
+              border: isFullCanvas && !videoAvatar && !profile.avatar_url ? border : (isFullCanvas ? 'none' : border),
+              boxShadow: isFullCanvas ? 'none' : boxShadow,
+              margin: '0 auto 14px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: isFullCanvas ? 'visible' : 'hidden',
+              position: 'relative',
+              background: shape === 'square' || shape === 'original' || isFullCanvas ? 'transparent' : 'rgba(255,255,255,0.15)',
+            };
+
+            const offsetX = profile.settings?.avatar_offset_x ?? 0;
+            const offsetY = profile.settings?.avatar_offset_y ?? 0;
+
+            const mediaStyle: React.CSSProperties = {
+              width: isFullCanvas ? 'auto' : (shape === 'original' ? 'auto' : '100%'),
+              height: isFullCanvas ? 'auto' : (shape === 'original' ? 'auto' : '100%'),
+              maxWidth: isFullCanvas ? '280px' : '100%',
+              maxHeight: isFullCanvas ? '200px' : '100%',
+              objectFit: isFullCanvas ? 'contain' : fit,
+              borderRadius: isFullCanvas ? r : undefined,
+              border: isFullCanvas ? border : undefined,
+              boxShadow: isFullCanvas ? boxShadow : undefined,
+              transform: `translate(${offsetX}%, ${offsetY}%) scale(${zoom / 100})`,
+              transformOrigin: 'center center',
+              display: 'block',
+            };
+
+            if (videoAvatar) {
+              const isVideoFile = videoAvatar.endsWith('.mp4') || videoAvatar.endsWith('.webm') || videoAvatar.includes('format=mp4') || videoAvatar.includes('.mp4?') || videoAvatar.includes('.webm?');
+
+              return (
+                <div className="pohon-avatar" style={containerStyle}>
+                  {isVideoFile ? (
+                    <video
+                      src={videoAvatar}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      style={mediaStyle}
+                    />
+                  ) : (
+                    <img
+                      src={videoAvatar}
+                      alt={profile.display_name || profile.username}
+                      style={mediaStyle}
+                    />
+                  )}
+                </div>
+              );
+            }
 
             return profile.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name || profile.username}
-                className="pohon-avatar"
-                style={{
-                  width: '92px',
-                  height: '92px',
-                  borderRadius: avatarRadius,
-                  objectFit: avatarShape === 'square' ? 'contain' : 'cover',
-                  margin: '0 auto 14px',
-                  border: avatarBorder,
-                  boxShadow: avatarShadow,
-                  display: 'block',
-                  background: 'transparent',
-                }}
-              />
+              <div className="pohon-avatar" style={containerStyle}>
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.display_name || profile.username}
+                  style={mediaStyle}
+                />
+              </div>
             ) : (
-              <div className="pohon-avatar" style={{
-                width: '92px',
-                height: '92px',
-                borderRadius: avatarRadius,
-                background: avatarShape === 'square' ? 'transparent' : 'rgba(255,255,255,0.15)',
-                margin: '0 auto 14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '40px',
-                border: avatarBorder,
-              }}>🌿</div>
+              <div className="pohon-avatar" style={containerStyle}>
+                <span style={{ fontSize: size === 'small' ? '30px' : size === 'xlarge' ? '54px' : '40px' }}>🌿</span>
+              </div>
             );
           })()}
 
@@ -356,6 +539,34 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
             }}>
               {profile.bio}
             </p>
+          )}
+
+          {/* vCard Contact Download */}
+          {profile.settings?.vcard?.enabled && (
+            <div style={{ marginTop: '12px' }}>
+              <a
+                href={`/api/vcard/${profile.username}`}
+                download={`${profile.username}-contact.vcf`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: theme.btn_radius || '4px',
+                  color: theme.text_color,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  backdropFilter: 'blur(8px)',
+                  transition: 'background 0.15s',
+                }}
+              >
+                <span>📇</span>
+                <span>Simpan Kontak</span>
+              </a>
+            </div>
           )}
 
           {/* Social Icons Bar (Top position) */}
@@ -516,19 +727,43 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                     );
                   }
 
+                  if (link.type === 'lead_form') {
+                    return (
+                      <LeadFormWidget
+                        key={link.id}
+                        link={link}
+                        profileId={profile.id}
+                        theme={theme}
+                        layoutType={layoutType}
+                      />
+                    );
+                  }
+
                   if (isEmbed && link.url) {
                     const embed = embedInfo;
                     const embedType = meta?.embed_type || embed?.type;
                     const embedSrc = meta?.embed_url || embed?.embedUrl;
 
                     if (embedSrc) {
+                      const iconMap: Record<string, string> = {
+                        spotify: '🎵',
+                        youtube: '▶️',
+                        apple_music: '🍎',
+                        soundcloud: '☁️',
+                        vimeo: '🎬',
+                        twitch: '🟣',
+                        calendly: '📅',
+                        cal_com: '📆',
+                      };
+                      const isCalendar = String(embedType) === 'calendly' || String(embedType) === 'cal_com';
+                      const iframeHeight = isCalendar ? '560' : String(embedType) === 'spotify' ? '152' : String(embedType) === 'apple_music' ? '175' : String(embedType) === 'soundcloud' ? '166' : '220';
                       return (
                         <div
                           key={link.id}
                           className="pohon-embed-card"
                           style={{
                             width: '100%',
-                            borderRadius: theme.btn_radius || '12px',
+                            borderRadius: theme.btn_radius || '4px',
                             overflow: 'hidden',
                             background: theme.card_bg,
                             border: '1px solid rgba(255,255,255,0.1)',
@@ -539,16 +774,16 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                           {link.title && (
                             <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontSize: '13px' }}>
-                                {embedType === 'spotify' ? '🎵' : embedType === 'youtube' ? '▶️' : '🍎'}
+                                {iconMap[String(embedType)] || '▶️'}
                               </span>
                               <span style={{ fontSize: '13px', fontWeight: 600 }}>{link.title}</span>
                             </div>
                           )}
-                          <div style={{ position: 'relative', width: '100%', minHeight: embedType === 'spotify' ? '152px' : embedType === 'apple_music' ? '175px' : '220px' }}>
+                          <div style={{ position: 'relative', width: '100%', minHeight: `${iframeHeight}px` }}>
                             <iframe
                               src={String(embedSrc)}
                               width="100%"
-                              height={embedType === 'spotify' ? '152' : embedType === 'apple_music' ? '175' : '220'}
+                              height={iframeHeight}
                               style={{ border: 'none', display: 'block' }}
                               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                               loading="lazy"
@@ -572,16 +807,17 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                   const domain = link.url ? getDomain(link.url) : '';
                   const btnStyles = getButtonStyles();
                   const isLocked = meta?.is_locked && !unlockedLinks[link.id];
+                  const isFeatured = Boolean(meta?.is_featured);
 
                   return (
                     <button
                       key={link.id}
                       onClick={() => handleLinkClick(link, href)}
-                      className={`pohon-link-btn ${link.is_pinned ? 'is-pinned' : ''}`}
+                      className={`pohon-link-btn ${link.is_pinned ? 'is-pinned' : ''} ${isFeatured ? 'is-featured' : ''}`}
                       style={{
                         ...btnStyles,
                         width: '100%',
-                        padding: layoutType === 'grid' ? '14px 12px' : '15px 20px',
+                        padding: layoutType === 'grid' ? '14px 12px' : isFeatured ? '18px 20px' : '15px 20px',
                         color: theme.text_color,
                         cursor: 'pointer',
                         textAlign: 'center',
@@ -593,7 +829,9 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                         justifyContent: 'center',
                         textDecoration: 'none',
                         boxSizing: 'border-box',
-                        minHeight: layoutType === 'grid' ? '72px' : '52px',
+                        minHeight: layoutType === 'grid' ? '72px' : isFeatured ? '60px' : '52px',
+                        border: isFeatured ? '1.5px solid var(--accent, #7DF9B6)' : btnStyles.border,
+                        boxShadow: isFeatured ? '0 0 24px rgba(125, 249, 182, 0.25)' : btnStyles.boxShadow,
                         flexShrink: layoutType === 'carousel' ? 0 : undefined,
                         minWidth: layoutType === 'carousel' ? '200px' : undefined,
                         scrollSnapAlign: layoutType === 'carousel' ? 'start' : undefined,
@@ -602,6 +840,23 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; (e.currentTarget as HTMLButtonElement).style.transform = 'none'; }}
                     >
+                      {isFeatured && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-8px',
+                          right: '12px',
+                          background: 'var(--accent, #7DF9B6)',
+                          color: '#000000',
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          padding: '1px 6px',
+                          borderRadius: '3px',
+                          letterSpacing: '0.04em',
+                        }}>
+                          ⭐ FEATURED
+                        </span>
+                      )}
+
                       {domain && !isLocked && (
                         <img
                           src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
@@ -616,7 +871,7 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                       {link.type === 'email' && <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }}>📧</span>}
                       {Boolean(isLocked) && <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px' }}>🔒</span>}
 
-                      <span style={{ fontSize: '14px', fontWeight: 600, lineHeight: 1.3 }}>
+                      <span style={{ fontSize: isFeatured ? '15px' : '14px', fontWeight: isFeatured ? 700 : 600, lineHeight: 1.3 }}>
                         {link.title}
                       </span>
 
@@ -919,8 +1174,8 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
           {profile.settings?.custom_footer_text?.trim() ? (
             <span>{profile.settings.custom_footer_text.trim()}</span>
           ) : (
-            <a href="/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 500 }}>
-              🌿 Dibuat dengan Pohonlink
+            <a href="/about" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 500 }}>
+              Dibuat dengan Pohonlink
             </a>
           )}
         </footer>
@@ -1004,7 +1259,7 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
             boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
           }}>
             <div style={{ fontSize: '36px', marginBottom: '10px' }}>
-              {(activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'age' ? '🔞' : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'sensitive' ? '⚠️' : '🔒'}
+              {(activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'age' ? '🔞' : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'sensitive' ? '⚠️' : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'subscribe' ? '📩' : '🔒'}
             </div>
 
             <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '6px' }}>
@@ -1016,6 +1271,8 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                 ? 'Link ini diperuntukkan untuk pengguna berusia 18 tahun ke atas. Konfirmasi umur kamu untuk membuka.'
                 : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'sensitive'
                 ? 'Link ini mungkin mengandung konten sensitif. Apakah kamu ingin tetap melanjutkan?'
+                : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'subscribe'
+                ? 'Masukkan alamat email kamu untuk membuka tautan eksklusif ini.'
                 : 'Link ini dilindungi PIN. Masukkan PIN untuk membuka tautan.'}
             </p>
 
@@ -1050,6 +1307,28 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                 />
               )}
 
+              {(activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'subscribe' && (
+                <input
+                  type="email"
+                  placeholder="Masukkan email kamu..."
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  autoFocus
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    background: 'rgba(0,0,0,0.3)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
+
               <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                 <button
                   type="submit"
@@ -1065,7 +1344,7 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
                     cursor: 'pointer',
                   }}
                 >
-                  {(activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'age' ? 'Saya 18+ Tahun' : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'sensitive' ? 'Saya Mengerti' : 'Buka Kunci'}
+                  {(activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'age' ? 'Saya 18+ Tahun' : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'sensitive' ? 'Saya Mengerti' : (activeLockModal.link.custom_css as Record<string, unknown> | null)?.lock_type === 'subscribe' ? 'Buka & Dapatkan Link' : 'Buka Kunci'}
                 </button>
                 <button
                   type="button"
@@ -1086,6 +1365,129 @@ export default function ProfilePublic({ profile, links, products = [], initialTa
             </form>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function LeadFormWidget({ link, profileId, theme, layoutType }: { link: Link; profileId: string; theme: Profile['theme_config']; layoutType: string }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [isPending, startTransition] = useTransition();
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      const res = await submitLeadCapture(profileId, name, email, link.title || undefined);
+      if (res?.error) setError(res.error);
+      else {
+        setSubmitted(true);
+      }
+    });
+  };
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        background: theme.card_bg,
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: theme.btn_radius || '4px',
+        padding: '18px 20px',
+        gridColumn: layoutType === 'grid' ? '1 / -1' : undefined,
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+        <span style={{ fontSize: '18px' }}>📩</span>
+        <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '4px 0 2px', color: theme.text_color }}>
+          {link.title || 'Daftar Newsletter'}
+        </h4>
+        {(link.custom_css as Record<string, unknown> | null)?.subtitle ? (
+          <p style={{ fontSize: '12px', opacity: 0.7, margin: 0, lineHeight: 1.4 }}>
+            {String((link.custom_css as Record<string, unknown>).subtitle)}
+          </p>
+        ) : null}
+      </div>
+
+      {submitted ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '12px',
+          background: 'rgba(125,249,182,0.15)',
+          border: '1px solid var(--accent, #7DF9B6)',
+          borderRadius: theme.btn_radius || '4px',
+          fontSize: '13px',
+          color: 'var(--accent, #7DF9B6)',
+          fontWeight: 600,
+        }}>
+          ✓ Terima kasih! Data Anda berhasil disimpan.
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {error && (
+            <div style={{ padding: '6px 10px', background: 'rgba(255,77,77,0.15)', border: '1px solid rgba(255,77,77,0.3)', borderRadius: '4px', fontSize: '11px', color: '#ff6b6b' }}>
+              {error}
+            </div>
+          )}
+          <input
+            type="text"
+            placeholder="Nama Anda"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            required
+            style={{
+              width: '100%',
+              padding: '9px 12px',
+              background: 'rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: theme.btn_radius || '4px',
+              color: theme.text_color,
+              fontSize: '12px',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          <input
+            type="email"
+            placeholder="Email Anda"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            style={{
+              width: '100%',
+              padding: '9px 12px',
+              background: 'rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: theme.btn_radius || '4px',
+              color: theme.text_color,
+              fontSize: '12px',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={isPending}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: 'var(--accent, #7DF9B6)',
+              color: '#000000',
+              border: 'none',
+              borderRadius: theme.btn_radius || '4px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: isPending ? 'not-allowed' : 'pointer',
+              marginTop: '4px',
+            }}
+          >
+            {isPending ? 'Mengirim...' : 'Daftar Sekarang'}
+          </button>
+        </form>
       )}
     </div>
   );

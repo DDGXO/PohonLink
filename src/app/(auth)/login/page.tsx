@@ -131,6 +131,14 @@ export default function LoginPage() {
           Belum punya akun?{' '}
           <Link href="/register" style={{ color: 'var(--accent)', fontWeight: 500 }}>Daftar</Link>
         </p>
+
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-dim)', marginTop: '24px' }}>
+          <Link href="/" style={{ color: 'inherit', textDecoration: 'none' }}>Beranda</Link>
+          <span>•</span>
+          <Link href="/about" style={{ color: 'inherit', textDecoration: 'none' }}>Tentang</Link>
+          <span>•</span>
+          <Link href="/thank-you" style={{ color: 'inherit', textDecoration: 'none' }}>Terima Kasih</Link>
+        </div>
       </div>
     </main>
   );

@@ -32,7 +32,9 @@ function normalizeLink(link: Record<string, unknown>): Link {
   const customCss = link.custom_css as Record<string, unknown> | null;
   const url = typeof link.url === 'string' ? link.url : '';
 
-  if (customCss?.is_html) {
+  if (customCss?.is_lead_form) {
+    type = 'lead_form';
+  } else if (customCss?.is_html) {
     type = 'html';
   } else if (type === 'link' && url.startsWith('mailto:')) {
     type = 'email';
@@ -46,7 +48,7 @@ function normalizeLink(link: Record<string, unknown>): Link {
   } as unknown as Link;
 }
 
-export const getActiveLinks = cache(async (userId: string) => {
+export const getActiveLinks = cache(async (userId: string, smartSort = false) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('links')
@@ -58,11 +60,12 @@ export const getActiveLinks = cache(async (userId: string) => {
 
   if (error || !data) return [];
   const now = Date.now();
-  return data
+  const filtered = data
     .map(normalizeLink)
     .filter(link => {
       const meta = link.custom_css as Record<string, unknown> | null;
       if (meta?.is_product) return false;
+      if (meta?.is_archived) return false;
       if (meta?.schedule_start) {
         const st = new Date(meta.schedule_start as string).getTime();
         if (!isNaN(st) && now < st) return false;
@@ -73,6 +76,16 @@ export const getActiveLinks = cache(async (userId: string) => {
       }
       return true;
     });
+
+  if (smartSort) {
+    return filtered.sort((a, b) => {
+      if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+      if (b.click_count !== a.click_count) return b.click_count - a.click_count;
+      return a.sort_order - b.sort_order;
+    });
+  }
+
+  return filtered;
 });
 
 export const getActiveProducts = cache(async (userId: string) => {
@@ -240,7 +253,7 @@ export const getReferrerBreakdown = cache(async (profileId: string) => {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
 });
 
-export const getAnalyticsEvents = cache(async (profileId: string, limit: number = 500) => {
+export const getAnalyticsEvents = cache(async (profileId: string, limit: number = 5000) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('analytics_events')
